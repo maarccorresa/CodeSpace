@@ -42,6 +42,7 @@ export interface SessionData {
     userUsername?: string;
     userNickname?: string;
     isLoggedIn?: boolean;
+    unlockedWorkspaces?: string[];
     id: string;
 }
 
@@ -56,6 +57,7 @@ declare module 'express-session' {
         userUsername?: string;
         userNickname?: string;
         isLoggedIn?: boolean;
+        unlockedWorkspaces?: string[];
     }
 }
 

@@ -28,6 +28,14 @@ router.post('/create', async (req: Request, res: Response) => {
         if (!workspaceId || !title || !description) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
+        if (typeof title !== 'string' || typeof description !== 'string' || typeof workspaceId !== 'string'
+            || title.length > 200 || description.length > 5000) {
+            return res.status(400).json({ error: 'Título (máx. 200) o descripción (máx. 5000) no válidos' });
+        }
+        if (!['bug', 'feature', 'help', 'other'].includes(category || 'other')
+            || !['low', 'medium', 'high'].includes(priority || 'medium')) {
+            return res.status(400).json({ error: 'Categoría o prioridad no válidas' });
+        }
 
         const ticket = await ticketService.createTicket({
             workspaceId,
@@ -124,8 +132,8 @@ router.post('/:ticketId/response', async (req: Request, res: Response) => {
         const { ticketId } = req.params;
         const { message } = req.body;
 
-        if (!message) {
-            return res.status(400).json({ error: 'Faltan campos requeridos' });
+        if (typeof message !== 'string' || !message.trim() || message.length > 5000) {
+            return res.status(400).json({ error: 'Mensaje vacío o demasiado largo (máx. 5000)' });
         }
 
         const existingTicket = await ticketService.getTicketById(ticketId);

@@ -12,8 +12,19 @@ export async function connectDatabase(): Promise<void> {
             return;
         }
 
-        await mongoose.connect(config.mongoUri);
-        
+        // En Docker, MongoDB puede tardar unos segundos en aceptar conexiones
+        const attempts = 15;
+        for (let i = 1; ; i++) {
+            try {
+                await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: 3000 });
+                break;
+            } catch (err) {
+                if (i >= attempts) throw err;
+                console.warn(`   MongoDB aún no responde (intento ${i}/${attempts}), reintentando…`);
+                await new Promise((r) => setTimeout(r, 2000));
+            }
+        }
+
         console.log('✅ Conectado a MongoDB');
         console.log(`   Base de datos: ${mongoose.connection.name}`);
         
@@ -31,8 +42,12 @@ export async function connectDatabase(): Promise<void> {
         });
 
     } catch (error) {
-        console.error('❌ Error al conectar a MongoDB:', error);
-        console.warn('   El servidor continuará sin persistencia de chat.');
+        console.error('❌ Error al conectar a MongoDB:', (error as Error).message);
+        if (config.isProduction) {
+            // En producción la base de datos es obligatoria: Docker reinicia el contenedor
+            process.exit(1);
+        }
+        console.warn('   El servidor continuará en modo archivos.');
     }
 }
 

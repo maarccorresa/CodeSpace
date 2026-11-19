@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { chatService } from '../services/chat.service';
+import { requireAdmin } from '../middleware/auth';
+import { canReadWorkspace } from '../utils/access';
 
 const router = Router();
 
@@ -7,7 +9,10 @@ const router = Router();
 router.get('/:workspaceId/messages', async (req: Request, res: Response) => {
     try {
         const { workspaceId } = req.params;
-        const limit = parseInt(req.query.limit as string) || 50;
+        if (!(await canReadWorkspace(req, workspaceId))) {
+            return res.status(403).json({ success: false, error: 'Sin acceso a este workspace' });
+        }
+        const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
         
         const messages = await chatService.getWorkspaceMessages(workspaceId, limit);
         
@@ -29,7 +34,10 @@ router.get('/:workspaceId/messages', async (req: Request, res: Response) => {
 router.get('/:workspaceId/stats', async (req: Request, res: Response) => {
     try {
         const { workspaceId } = req.params;
-        
+        if (!(await canReadWorkspace(req, workspaceId))) {
+            return res.status(403).json({ success: false, error: 'Sin acceso a este workspace' });
+        }
+
         const stats = await chatService.getChatStats(workspaceId);
         
         res.json({
@@ -46,7 +54,7 @@ router.get('/:workspaceId/stats', async (req: Request, res: Response) => {
 });
 
 // Eliminar mensajes de un workspace (solo admin)
-router.delete('/:workspaceId/messages', async (req: Request, res: Response) => {
+router.delete('/:workspaceId/messages', requireAdmin, async (req: Request, res: Response) => {
     try {
         const { workspaceId } = req.params;
         

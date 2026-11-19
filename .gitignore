@@ -8,7 +8,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
 # Workspace data (contiene datos de usuarios)
 workspaces-data/
@@ -29,8 +28,6 @@ desktop.ini
 *.swo
 *~
 
-# Docker
-.dockerignore
 
 # Build
 dist/
@@ -39,3 +36,5 @@ build/
 # Temporal
 tmp/
 temp/
+backups/
+tickets-data/

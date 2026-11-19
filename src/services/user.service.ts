@@ -48,7 +48,7 @@ export async function registerUser(
             ownedWorkspaces: [],
             participatedWorkspaces: []
         });
-        return { user: { id: (user._id as unknown) as string, email: user.email, username: user.username, nickname: user.nickname } };
+        return { user: { id: String(user._id), email: user.email, username: user.username, nickname: user.nickname } };
     }
 
     // fallback fichero
@@ -85,10 +85,12 @@ export async function loginUser(
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) return { error: 'Credenciales inválidas' };
+        if (user.blocked) return { error: 'Tu cuenta está bloqueada' };
+        if (user.active === false) return { error: 'Tu cuenta está desactivada' };
 
         user.lastLogin = new Date();
         await user.save();
-        return { user: { id: (user._id as unknown) as string, email: user.email, username: user.username, nickname: user.nickname || user.username } };
+        return { user: { id: String(user._id), email: user.email, username: user.username, nickname: user.nickname || user.username } };
     }
 
     // fallback fichero
@@ -98,6 +100,8 @@ export async function loginUser(
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return { error: 'Credenciales inválidas' };
+    if (user.blocked) return { error: 'Tu cuenta está bloqueada' };
+    if (user.active === false) return { error: 'Tu cuenta está desactivada' };
 
     user.lastLogin = new Date().toISOString();
     await writeUsersFile(users);

@@ -3,10 +3,12 @@ import { isDatabaseConnected } from '../database/connection';
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config';
+import { isValidWorkspaceId } from '../utils/validation';
 
 export class ChatService {
     // Ruta del archivo de chat para un workspace
     private getChatFilePath(workspaceId: string): string {
+        if (!isValidWorkspaceId(workspaceId)) throw new Error('workspace inválido');
         return path.join(process.cwd(), config.dataDir, workspaceId, 'chat.json');
     }
 

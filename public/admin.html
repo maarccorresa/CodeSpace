@@ -17,7 +17,7 @@
             --border:  #30363d;
             --text:    #e6edf3;
             --muted:   #7d8590;
-            --teal:    #4ec9b0;
+            --teal:    var(--cs-accent);
             --blue:    #79c0ff;
             --purple:  #d2a8ff;
             --red:     #ff7b72;
@@ -67,7 +67,7 @@
         }
         .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
         .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-        .nav-item.active { color: var(--teal); background: rgba(78,201,176,0.07); }
+        .nav-item.active { color: var(--teal); background: rgba(59,130,246,0.07); }
         .nav-item.active::before {
             content: ''; position: absolute;
             left: 0; top: 4px; bottom: 4px;
@@ -88,7 +88,7 @@
         }
         .user-avatar {
             width: 30px; height: 30px; border-radius: 6px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: var(--cs-accent);
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 0.8em; color: white; flex-shrink: 0;
         }
@@ -125,7 +125,7 @@
             display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
         .stat-icon svg { width: 18px; height: 18px; }
-        .stat-icon.teal   { background: rgba(78,201,176,0.12);  color: var(--teal); }
+        .stat-icon.teal   { background: rgba(59,130,246,0.12);  color: var(--teal); }
         .stat-icon.blue   { background: rgba(121,192,255,0.12); color: var(--blue); }
         .stat-icon.purple { background: rgba(210,168,255,0.12); color: var(--purple); }
         .stat-icon.red    { background: rgba(255,123,114,0.12); color: var(--red); }
@@ -177,7 +177,7 @@
         /* BUTTONS */
         .btn {
             display: inline-flex; align-items: center; gap: 6px;
-            background: var(--teal); color: #0f1117;
+            background: var(--teal); color: #fff;
             border: none; border-radius: 8px; padding: 8px 15px;
             font-size: 0.85em; font-weight: 600;
             cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
@@ -206,8 +206,8 @@
         .b-closed   { background: rgba(125,133,144,0.14); color: var(--muted); }
         .b-high     { background: rgba(255,123,114,0.14); color: var(--red); }
         .b-medium   { background: rgba(255,166,87,0.14);  color: var(--orange); }
-        .b-low      { background: rgba(78,201,176,0.14);  color: var(--teal); }
-        .b-active   { background: rgba(78,201,176,0.14);  color: var(--teal); }
+        .b-low      { background: rgba(59,130,246,0.14);  color: var(--teal); }
+        .b-active   { background: rgba(59,130,246,0.14);  color: var(--teal); }
         .b-inactive { background: rgba(125,133,144,0.14); color: var(--muted); }
 
         /* SUBTABS */
@@ -340,7 +340,7 @@
         /* TOAST */
         #toasts { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { padding: 11px 16px; border-radius: 8px; font-size: 0.86em; font-weight: 500; max-width: 340px; word-wrap: break-word; box-shadow: 0 4px 18px rgba(0,0,0,0.45); animation: slideIn 0.22s ease-out; pointer-events: auto; }
-        .t-success { background: var(--teal);   color: #0f1117; }
+        .t-success { background: var(--teal);   color: #fff; }
         .t-error   { background: var(--red);    color: white; }
         .t-warn    { background: var(--orange); color: #0f1117; }
         .t-info    { background: var(--blue);   color: #0f1117; }
@@ -351,6 +351,11 @@
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 </head>
 <body>
 
@@ -987,10 +992,11 @@ function renderActiveUsers(users) {
     });
     list.innerHTML = sorted.map(u => {
         const online   = _auOnlineIds.has(u.id);
-        const dotClr   = online ? 'var(--green, #4ec9b0)' : 'var(--muted)';
+        const dotClr   = online ? 'var(--green, var(--cs-accent))' : 'var(--muted)';
         const dotTitle = online ? 'Online' : 'Offline';
         const nick = u.nickname ? '<span style="color:var(--muted);font-size:.82em;"> (' + escHtml(u.nickname) + ')</span>' : '';
         return '<li style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);">' +
+            '<img class="cs-avatar" src="/img/avatar-default.svg" alt="" style="width:28px;height:28px;">' +
             '<span title="' + dotTitle + '" style="width:10px;height:10px;border-radius:50%;background:' + dotClr + ';flex-shrink:0;box-shadow:' + (online ? '0 0 6px ' + dotClr : 'none') + ';"></span>' +
             '<span style="flex:1;">' + escHtml(u.username) + nick + '</span>' +
             '<span style="font-size:.80em;color:var(--muted);">' + (online ? 'Online' : 'Offline') + '</span>' +
@@ -1025,12 +1031,12 @@ async function loadIPStats() {
         if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Sin datos</td></tr>'; return; }
         tbody.innerHTML = data.map(s =>
             '<tr>' +
-                '<td style="font-family:monospace;">' + s._id + '</td>' +
+                '<td style="font-family:monospace;">' + escHtml(s._id) + '</td>' +
                 '<td>' + s.totalAccess + '</td>' +
                 '<td>' + s.uniqueWorkspaces + '</td>' +
                 '<td style="color:var(--muted);font-size:0.82em;">' + new Date(s.lastAccess).toLocaleString('es-ES') + '</td>' +
                 '<td style="color:' + (s.blockedAttempts ? 'var(--red)' : 'inherit') + ';">' + (s.blockedAttempts || 0) + '</td>' +
-                '<td><button class="btn btn-danger btn-sm" onclick="blockIPPrompt(\'' + s._id + '\')">' +
+                '<td><button class="btn btn-danger btn-sm" onclick="blockIPPrompt(' + jsArg(s._id) + ')">' +
                     '<i data-feather="shield-off"></i> Bloquear</button></td>' +
             '</tr>'
         ).join('');
@@ -1047,9 +1053,9 @@ async function loadRecentActivity() {
         tbody.innerHTML = data.map(a =>
             '<tr>' +
                 '<td style="color:var(--muted);font-size:0.82em;">' + new Date(a.timestamp).toLocaleString('es-ES') + '</td>' +
-                '<td style="font-family:monospace;">' + a.ip + '</td>' +
-                '<td style="color:var(--teal);">' + (a.workspaceId || '—') + '</td>' +
-                '<td>' + a.action + '</td>' +
+                '<td style="font-family:monospace;">' + escHtml(a.ip) + '</td>' +
+                '<td style="color:var(--teal);">' + (escHtml(a.workspaceId) || '—') + '</td>' +
+                '<td>' + escHtml(a.action) + '</td>' +
                 '<td>' + (a.blocked ? '<span style="color:var(--red);">Sí</span>' : 'No') + '</td>' +
             '</tr>'
         ).join('');
@@ -1065,13 +1071,13 @@ async function loadBlockedIPs() {
         if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No hay IPs bloqueadas</td></tr>'; return; }
         tbody.innerHTML = data.map(b =>
             '<tr>' +
-                '<td style="font-family:monospace;">' + b.ip + '</td>' +
-                '<td>' + b.reason + '</td>' +
-                '<td>' + (b.blockedBy || 'Sistema') + '</td>' +
-                '<td style="color:var(--muted);font-size:0.82em;">' + new Date(b.createdAt).toLocaleString('es-ES') + '</td>' +
+                '<td style="font-family:monospace;">' + escHtml(b.ip) + '</td>' +
+                '<td>' + escHtml(b.reason) + '</td>' +
+                '<td>' + (escHtml(b.blockedBy) || 'Sistema') + '</td>' +
+                '<td style="color:var(--muted);font-size:0.82em;">' + new Date(b.createdAt || b.blockedAt).toLocaleString('es-ES') + '</td>' +
                 '<td style="color:' + (b.permanent ? 'var(--red)' : 'var(--muted)') + ';">' +
                     (b.permanent ? 'Permanente' : (b.expiresAt ? new Date(b.expiresAt).toLocaleString('es-ES') : '—')) + '</td>' +
-                '<td><button class="btn btn-sm" style="background:var(--teal);color:#0f1117;" onclick="unblockIP(\'' + b.ip + '\')">' +
+                '<td><button class="btn btn-sm" style="background:var(--teal);color:#fff;" onclick="unblockIP(' + jsArg(b.ip) + ')">' +
                     '<i data-feather="shield"></i> Desbloquear</button></td>' +
             '</tr>'
         ).join('');
@@ -1087,7 +1093,7 @@ async function loadWsStats() {
         if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">Sin datos</td></tr>'; return; }
         tbody.innerHTML = data.map(s =>
             '<tr>' +
-                '<td><span class="ws-link" onclick="window.open(\'/' + s._id + '\',\'_blank\')">' + s._id + '</span></td>' +
+                '<td><span class="ws-link" onclick="window.open(\'/' + encodeURIComponent(s._id) + '\',\'_blank\')">' + escHtml(s._id) + '</span></td>' +
                 '<td>' + s.totalAccess + '</td><td>' + s.uniqueIPs + '</td><td>' + s.uniqueUsers + '</td>' +
                 '<td style="color:var(--muted);font-size:0.82em;">' + new Date(s.lastAccess).toLocaleString('es-ES') + '</td>' +
             '</tr>'
@@ -1165,11 +1171,11 @@ function renderTicketsTable() {
     }
     tbody.innerHTML = filteredTickets.map(t =>
         '<tr>' +
-            '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + t.title + '">' + t.title + '</td>' +
-            '<td><span class="ws-link" onclick="window.open(\'/' + t.workspaceId + '\',\'_blank\')">' + t.workspaceId + '</span></td>' +
+            '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(t.title) + '">' + escHtml(t.title) + '</td>' +
+            '<td><span class="ws-link" onclick="window.open(\'/' + encodeURIComponent(t.workspaceId) + '\',\'_blank\')">' + escHtml(t.workspaceId) + '</span></td>' +
             '<td><span class="badge ' + (STATUS_CLASS[t.status]||'') + '">' + (STATUS_TXT[t.status]||t.status) + '</span></td>' +
-            '<td style="color:var(--muted);">' + t.category + '</td>' +
-            '<td><span class="badge ' + (PRIO_CLASS[t.priority]||'') + '">' + t.priority + '</span></td>' +
+            '<td style="color:var(--muted);">' + escHtml(t.category) + '</td>' +
+            '<td><span class="badge ' + (PRIO_CLASS[t.priority]||'') + '">' + escHtml(t.priority) + '</span></td>' +
             '<td style="color:var(--muted);font-size:0.82em;">' + fmtDate(t.createdAt) + '</td>' +
             '<td style="color:var(--blue);">' + (t.responses ? t.responses.length : 0) + '</td>' +
             '<td><div class="actions">' +
@@ -1191,14 +1197,14 @@ async function openTicket(id) {
         document.getElementById('ticketStatusSel').value        = currentTicket.status;
         document.getElementById('ticketMeta').innerHTML =
             '<div class="ticket-meta-row">' +
-                '<span>Workspace:</span><span style="color:var(--teal);">' + currentTicket.workspaceId + '</span>' +
-                '<span>Usuario:</span><span>' + currentTicket.userId + '</span>' +
+                '<span>Workspace:</span><span style="color:var(--teal);">' + escHtml(currentTicket.workspaceId) + '</span>' +
+                '<span>Usuario:</span><span>' + escHtml(currentTicket.userNickname || currentTicket.userEmail || currentTicket.userId) + '</span>' +
             '</div>' +
             '<div class="ticket-meta-row">' +
-                '<span>Categoría:</span><span>' + currentTicket.category + '</span>' +
-                '<span>Prioridad:</span><span class="badge ' + (PRIO_CLASS[currentTicket.priority]||'') + '" style="margin-left:4px;">' + currentTicket.priority + '</span>' +
+                '<span>Categoría:</span><span>' + escHtml(currentTicket.category) + '</span>' +
+                '<span>Prioridad:</span><span class="badge ' + (PRIO_CLASS[currentTicket.priority]||'') + '" style="margin-left:4px;">' + escHtml(currentTicket.priority) + '</span>' +
             '</div>' +
-            '<div class="ticket-desc">' + currentTicket.description + '</div>';
+            '<div class="ticket-desc">' + escHtml(currentTicket.description) + '</div>';
         renderChatMsgs();
         document.getElementById('chatInput').value = '';
         document.getElementById('ticketModal').classList.add('open');
@@ -1215,10 +1221,10 @@ function renderChatMsgs() {
         const time = new Date(r.timestamp).toLocaleString('es-ES', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
         return '<div class="chat-msg ' + (r.isAdmin ? 'admin' : '') + '">' +
             '<div class="chat-msg-header">' +
-                '<span class="chat-msg-user">' + (r.isAdmin ? 'Administrador' : 'Usuario') + '</span>' +
+                '<span class="chat-msg-user">' + escHtml(r.authorName || (r.isAdmin ? 'Administrador' : 'Usuario')) + '</span>' +
                 '<span>' + time + '</span>' +
             '</div>' +
-            '<div class="chat-msg-text">' + r.message + '</div></div>';
+            '<div class="chat-msg-text">' + escHtml(r.message) + '</div></div>';
     }).join('');
 }
 
@@ -1349,8 +1355,8 @@ function renderRegisteredUsers(users) {
             : '—';
         return `<tr ondblclick="openUserDetailModal('${escHtml(u.id)}')" style="cursor:pointer;">
             <td style="text-align:center;">${onlineDot}</td>
-            <td style="font-weight:500;">${escHtml(u.username)}</td>
-            <td><span style="background:rgba(78,201,176,.12);color:var(--teal);padding:2px 8px;border-radius:20px;font-size:.82em;">${escHtml(u.nickname)}</span></td>
+            <td style="font-weight:500;"><span style="display:inline-flex;align-items:center;gap:8px;"><img class="cs-avatar" src="/img/avatar-default.svg" alt="">${escHtml(u.username)}</span></td>
+            <td><span style="background:rgba(59,130,246,.12);color:var(--teal);padding:2px 8px;border-radius:20px;font-size:.82em;">${escHtml(u.nickname)}</span></td>
             <td style="color:var(--muted);font-size:.85em;">${escHtml(u.email)}</td>
             <td>${wsList}</td>
             <td>${ticketBadge}</td>
@@ -1363,8 +1369,10 @@ function renderRegisteredUsers(users) {
 
 function escHtml(str) {
     if (!str) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+// Argumento seguro para onclick="fn(...)"
+function jsArg(v) { return escHtml(JSON.stringify(String(v ?? ''))); }
 
 // ── USER DETAIL MODAL ────────────────────────────
 let currentDetailUser = null;
@@ -1446,7 +1454,7 @@ function renderUserAccessLogs(logs) {
     Object.entries(ipMap).forEach(([ip, info]) => {
         const lastAccessDate = new Date(info.lastAccess).toLocaleString('es-ES');
         html += `<div class="ip-row">
-            <div class="ip-addr">${ip}</div>
+            <div class="ip-addr">${escHtml(ip)}</div>
             <div class="ip-count">${info.count} accesos</div>
             <div class="ip-date">${lastAccessDate}</div>
         </div>`;
@@ -1621,15 +1629,15 @@ async function loadModerators() {
         if (!mods.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No hay moderadores</td></tr>'; return; }
         tbody.innerHTML = mods.map(m =>
             '<tr>' +
-                '<td style="font-family:monospace;">' + m.email + '</td>' +
-                '<td>' + (m.name || '<span style="color:var(--muted);">—</span>') + '</td>' +
+                '<td style="font-family:monospace;">' + escHtml(m.email) + '</td>' +
+                '<td>' + (escHtml(m.name) || '<span style="color:var(--muted);">—</span>') + '</td>' +
                 '<td style="color:var(--muted);font-size:0.82em;">' + fmtDate(m.createdAt) + '</td>' +
                 '<td style="color:var(--muted);font-size:0.82em;">' + (m.lastLogin ? fmtDate(m.lastLogin) : '<span style="color:var(--muted);">Nunca</span>') + '</td>' +
                 '<td><span class="badge ' + (m.active ? 'b-active' : 'b-inactive') + '">' + (m.active ? 'Activo' : 'Inactivo') + '</span></td>' +
                 '<td><div class="actions">' +
-                    '<button class="icon-btn" onclick="toggleMod(\'' + m.email + '\',' + !m.active + ')" title="' + (m.active ? 'Desactivar' : 'Activar') + '">' +
+                    '<button class="icon-btn" onclick="toggleMod(' + jsArg(m.email) + ',' + !m.active + ')" title="' + (m.active ? 'Desactivar' : 'Activar') + '">' +
                         '<i data-feather="' + (m.active ? 'user-x' : 'user-check') + '"></i></button>' +
-                    '<button class="icon-btn del" onclick="confirmDeleteMod(\'' + m.email + '\')" title="Eliminar"><i data-feather="trash-2"></i></button>' +
+                    '<button class="icon-btn del" onclick="confirmDeleteMod(' + jsArg(m.email) + ')" title="Eliminar"><i data-feather="trash-2"></i></button>' +
                 '</div></td>' +
             '</tr>'
         ).join('');

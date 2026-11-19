@@ -165,8 +165,16 @@ function minimizeWindow() {
 function toggleTheme() {
     const body = document.body;
     const themeText = document.getElementById('themeText');
-    const themeIcon = document.querySelector('.theme-toggle i');
-    
+    // feather.replace() cambia el <i> por un <svg>: se reemplaza por un <i> nuevo
+    const setThemeIcon = (name) => {
+        const btn = document.querySelector('.theme-toggle');
+        const old = btn && btn.querySelector('i, svg');
+        if (!old) return;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-feather', name);
+        old.replaceWith(icon);
+    };
+
     const isDark = body.classList.contains('dark-theme') || !body.classList.contains('light-theme');
     
     if (isDark) {
@@ -174,14 +182,14 @@ function toggleTheme() {
         body.classList.remove('dark-theme');
         body.classList.add('light-theme');
         themeText.textContent = 'Oscuro';
-        themeIcon.setAttribute('data-feather', 'moon');
+        setThemeIcon('moon');
         localStorage.setItem('theme', 'light');
     } else {
         // Cambiar a tema oscuro
         body.classList.remove('light-theme');
         body.classList.add('dark-theme');
         themeText.textContent = 'Claro';
-        themeIcon.setAttribute('data-feather', 'sun');
+        setThemeIcon('sun');
         localStorage.setItem('theme', 'dark');
     }
     
@@ -559,7 +567,7 @@ function updateAttemptsDisplay() {
         } else if (remainingAttempts === 2) {
             attemptsDisplay.style.color = '#ffab00';
         } else {
-            attemptsDisplay.style.color = '#4ec9b0';
+            attemptsDisplay.style.color = 'var(--cs-accent)';
         }
     }
 }
@@ -943,9 +951,9 @@ function showCommandsMenu() {
         // Mostrar usuarios disponibles
         menu.innerHTML = users.map((user, index) => `
             <div class="command-item ${index === selectedCommandIndex ? 'selected' : ''}" 
-                 onclick="selectUserForKick('${user}')" 
+                 onclick="selectUserForKick(${jsArg(user)})" 
                  data-index="${index}">
-                <div class="command-name">@${user}</div>
+                <div class="command-name">@${escapeHtml(user)}</div>
                 <div class="command-description">Expulsar usuario</div>
             </div>
         `).join('');
@@ -980,9 +988,9 @@ function showCommandsMenu() {
         // Mostrar usuarios disponibles
         menu.innerHTML = users.map((user, index) => `
             <div class="command-item ${index === selectedCommandIndex ? 'selected' : ''}" 
-                 onclick="selectUserForBan('${user}')" 
+                 onclick="selectUserForBan(${jsArg(user)})" 
                  data-index="${index}">
-                <div class="command-name">@${user}</div>
+                <div class="command-name">@${escapeHtml(user)}</div>
                 <div class="command-description">Banear IP del usuario ${isAdminOrModerator ? '(Admin)' : '(Requiere permisos)'}</div>
             </div>
         `).join('');
@@ -1312,6 +1320,7 @@ function addChatMessage(data, isOwn = false) {
         
         messageEl.innerHTML = `
             <div class="chat-message-header">
+                <img class="cs-avatar" src="/img/avatar-default.svg" alt="" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;">
                 <span class="chat-username">${escapeHtml(data.username)}</span>
                 <span class="chat-time">${time}</span>
             </div>
@@ -1354,6 +1363,7 @@ function updateUserList() {
         const userItem = document.createElement('div');
         userItem.className = 'user-item' + (userId === socket.id ? ' own' : '');
         userItem.innerHTML = `
+            <img class="cs-avatar" src="/img/avatar-default.svg" alt="">
             <div class="user-status"></div>
             <div class="user-name">${escapeHtml(userName)}</div>
         `;
@@ -1462,9 +1472,17 @@ function disableChatInput() {
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Argumento seguro para un onclick="fn(...)" dentro de HTML
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value ?? '')));
 }
 
 // Chat input enter key
@@ -1973,11 +1991,11 @@ function getIconForFile(filename) {
         'tsconfig.json': '<i class="devicon-typescript-plain colored"></i>',
         '.gitignore': '<i class="devicon-git-plain colored"></i>',
         '.env': '<i class="devicon-dotnetcore-plain colored"></i>',
-        'readme.md': '<i data-feather="book-open" style="color: #4ec9b0;"></i>',
+        'readme.md': '<i data-feather="book-open" style="color: var(--cs-accent);"></i>',
         'license': '<i data-feather="file-text" style="color: #969696;"></i>',
         'makefile': '<i data-feather="tool" style="color: #ce9178;"></i>',
         '.prettierrc': '<i data-feather="code" style="color: #c586c0;"></i>',
-        '.eslintrc': '<i data-feather="shield" style="color: #4ec9b0;"></i>'
+        '.eslintrc': '<i data-feather="shield" style="color: var(--cs-accent);"></i>'
     };
     
     if (specialFiles[name]) {
@@ -2023,9 +2041,9 @@ function getIconForFile(filename) {
         'kt': '<i class="devicon-kotlin-plain colored"></i>',
         
         // Shell/Scripts
-        'sh': '<i data-feather="terminal" style="color: #4ec9b0;"></i>',
-        'bash': '<i data-feather="terminal" style="color: #4ec9b0;"></i>',
-        'zsh': '<i data-feather="terminal" style="color: #4ec9b0;"></i>',
+        'sh': '<i data-feather="terminal" style="color: var(--cs-accent);"></i>',
+        'bash': '<i data-feather="terminal" style="color: var(--cs-accent);"></i>',
+        'zsh': '<i data-feather="terminal" style="color: var(--cs-accent);"></i>',
         'ps1': '<i data-feather="terminal" style="color: #569cd6;"></i>',
         
         // Data/Config
@@ -2039,8 +2057,8 @@ function getIconForFile(filename) {
         
         // Database
         'sql': '<i class="devicon-mysql-plain colored"></i>',
-        'db': '<i data-feather="database" style="color: #4ec9b0;"></i>',
-        'sqlite': '<i data-feather="database" style="color: #4ec9b0;"></i>',
+        'db': '<i data-feather="database" style="color: var(--cs-accent);"></i>',
+        'sqlite': '<i data-feather="database" style="color: var(--cs-accent);"></i>',
         
         // Documentation
         'md': '<i class="devicon-markdown-original colored"></i>',
@@ -2053,7 +2071,7 @@ function getIconForFile(filename) {
         'jpg': '<i data-feather="image" style="color: #c586c0;"></i>',
         'jpeg': '<i data-feather="image" style="color: #c586c0;"></i>',
         'gif': '<i data-feather="image" style="color: #c586c0;"></i>',
-        'svg': '<i data-feather="image" style="color: #4ec9b0;"></i>',
+        'svg': '<i data-feather="image" style="color: var(--cs-accent);"></i>',
         'ico': '<i data-feather="image" style="color: #969696;"></i>',
         
         // Archives
@@ -2071,7 +2089,7 @@ function getIconForFile(filename) {
         // Others
         'log': '<i data-feather="file-text" style="color: #969696;"></i>',
         'lock': '<i data-feather="lock" style="color: #ce9178;"></i>',
-        'env': '<i data-feather="key" style="color: #4ec9b0;"></i>'
+        'env': '<i data-feather="key" style="color: var(--cs-accent);"></i>'
     };
     
     return iconMap[ext] || '<i data-feather="file" style="color: #969696;"></i>';
@@ -2497,7 +2515,7 @@ function renderTreeNode(node, container, path) {
             itemEl.innerHTML = `
                 <span class="chevron">▸</span>
                 <span class="icon"><i data-feather="folder"></i></span>
-                <span>${key}</span>
+                <span>${escapeHtml(key)}</span>
             `;
             
             const childrenContainer = document.createElement('div');
@@ -2547,7 +2565,7 @@ function renderTreeNode(node, container, path) {
             const lockIcon = item.hasPassword ? ' <i data-feather="lock" style="width:12px;height:12px;vertical-align:middle;opacity:0.6;"></i>' : '';
             itemEl.innerHTML = `
                 <span class="icon">${fileIcon}</span>
-                <span>${key}${lockIcon}</span>
+                <span>${escapeHtml(key)}${lockIcon}</span>
             `;
             
             if (currentFile === itemPath) {
@@ -2593,7 +2611,7 @@ function openFile(path) {
 // Mostrar editor
 function showEditor() {
     emptyState.style.display = 'none';
-    editorWrapper.style.display = 'block';
+    editorWrapper.style.display = 'flex';
     if (codeMirrorEditor) {
         // Actualizar CodeMirror cuando se muestra el editor
         codeMirrorEditor.refresh();
@@ -2631,8 +2649,8 @@ function renderTabs() {
         const fileIcon = getIconForFile(fileName);
         tab.innerHTML = `
             ${fileIcon}
-            <span>${fileName}</span>
-            <span class="close-tab" onclick="closeTab('${tabPath}', event)">×</span>
+            <span>${escapeHtml(fileName)}</span>
+            <span class="close-tab" onclick="closeTab(${jsArg(tabPath)}, event)">×</span>
         `;
         
         tab.addEventListener('click', (e) => {
@@ -2879,7 +2897,7 @@ function generateGitHubInstructions(structure, owner, repo) {
             background: #1e1e1e;
             color: #d4d4d4;
         }
-        h1 { color: #4ec9b0; }
+        h1 { color: var(--cs-accent); }
         h2 { color: #569cd6; margin-top: 30px; }
         pre {
             background: #2d2d30;
@@ -3420,9 +3438,9 @@ function updatePasswordButton() {
     if (workspaceHasPassword) {
         btn.innerHTML = '<i data-feather="shield" style="width: 14px; height: 14px;"></i> Protegido';
         btn.title = 'Workspace protegido - Click para cambiar o quitar contraseña';
-        btn.style.background = 'rgba(78,201,176,0.15)';
-        btn.style.color = 'var(--green, #4ec9b0)';
-        btn.style.border = '1px solid rgba(78,201,176,0.4)';
+        btn.style.background = 'rgba(59,130,246,0.15)';
+        btn.style.color = 'var(--green, var(--cs-accent))';
+        btn.style.border = '1px solid rgba(59,130,246,0.4)';
     } else {
         btn.innerHTML = '<i data-feather="lock" style="width: 14px; height: 14px;"></i> Contraseña';
         btn.title = 'Proteger workspace con contraseña';
@@ -3538,7 +3556,7 @@ function showFileList() {
         
         item.innerHTML = `
             <i data-feather="file"></i>
-            <span class="file-path">${fileData.path}</span>
+            <span class="file-path">${escapeHtml(fileData.path)}</span>
             <span class="file-size">${size}</span>
         `;
         
@@ -3861,7 +3879,7 @@ function renderTickets() {
         return `
             <div class="ticket-card" onclick="viewTicketDetail('${ticket._id}')">
                 <div class="ticket-card-header">
-                    <div class="ticket-title">${ticket.title}</div>
+                    <div class="ticket-title">${escapeHtml(ticket.title)}</div>
                     <span class="ticket-status ${statusClass}">${statusText}</span>
                 </div>
                 <div class="ticket-meta">
@@ -3878,7 +3896,7 @@ function renderTickets() {
                         ${createdDate}
                     </div>
                 </div>
-                <div class="ticket-description">${ticket.description}</div>
+                <div class="ticket-description">${escapeHtml(ticket.description)}</div>
                 ${ticket.responses && ticket.responses.length > 0 ? `
                     <div class="ticket-responses-count">
                         <i data-feather="message-circle" style="width: 14px; height: 14px;"></i>
@@ -4070,10 +4088,10 @@ function renderTicketMessages() {
         return `
             <div class="ticket-message ${response.isAdmin ? 'admin' : ''}">
                 <div class="ticket-message-header">
-                    <span class="ticket-message-user">${authorName}</span>
+                    <span class="ticket-message-user">${escapeHtml(authorName)}</span>
                     <span class="ticket-message-time">${time}</span>
                 </div>
-                <div class="ticket-message-text">${response.message}</div>
+                <div class="ticket-message-text">${escapeHtml(response.message)}</div>
             </div>
         `;
     }).join('');

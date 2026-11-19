@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Gestión de CodeSpace con Docker.
+#   ./codespace install   primera instalación: genera .env, construye y arranca
+#   ./codespace update    git pull + reconstruir + reiniciar
+#   ./codespace up|down|restart|logs|status
+#   ./codespace backup    copia de MongoDB y de los workspaces en ./backups
+#   ./codespace restore <archivo.tar.gz>
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+c_ok()   { printf '\033[32m%s\033[0m\n' "$*"; }
+c_warn() { printf '\033[33m%s\033[0m\n' "$*"; }
+c_err()  { printf '\033[31m%s\033[0m\n' "$*" >&2; }
+
+compose() { docker compose "$@"; }
+
+need_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        c_err "Docker no está instalado. En Ubuntu/Debian: curl -fsSL https://get.docker.com | sh"
+        exit 1
+    fi
+    if ! docker compose version >/dev/null 2>&1; then
+        c_err "Falta el plugin 'docker compose' (v2)."
+        exit 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        c_err "No se puede hablar con Docker. ¿Está arrancado? ¿Tu usuario está en el grupo docker?"
+        exit 1
+    fi
+}
+
+rand() { openssl rand -hex "$1" 2>/dev/null || head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+
+env_get() { grep -E "^$1=" .env 2>/dev/null | tail -1 | cut -d= -f2-; }
+
+create_env() {
+    if [[ -f .env ]]; then
+        c_warn ".env ya existe: se conserva."
+        return
+    fi
+    local admin_email admin_pass port
+    read -r -p "Email del administrador [admin@codespace.local]: " admin_email || true
+    admin_email=${admin_email:-admin@codespace.local}
+    read -r -p "Puerto web [3000]: " port || true
+    port=${port:-3000}
+    admin_pass=$(rand 9)
+
+    sed -e "s|^APP_PORT=.*|APP_PORT=${port}|" \
+        -e "s|^SESSION_SECRET=.*|SESSION_SECRET=$(rand 32)|" \
+        -e "s|^ADMIN_EMAIL=.*|ADMIN_EMAIL=${admin_email}|" \
+        -e "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${admin_pass}|" \
+        -e "s|^MONGO_PASSWORD=.*|MONGO_PASSWORD=$(rand 24)|" \
+        .env.example > .env
+    chmod 600 .env
+    c_ok ".env creado (permisos 600)."
+}
+
+wait_healthy() {
+    local port; port=$(env_get APP_PORT); port=${port:-3000}
+    printf 'Esperando a que la aplicación responda'
+    for _ in $(seq 1 60); do
+        if curl -fsS "http://127.0.0.1:${port}/healthz" >/dev/null 2>&1; then
+            echo; c_ok "CodeSpace está en marcha: http://$(hostname -I 2>/dev/null | awk '{print $1}'):${port}"
+            return 0
+        fi
+        printf '.'; sleep 2
+    done
+    echo; c_err "La aplicación no responde. Revisa: ./codespace logs"
+    return 1
+}
+
+cmd_install() {
+    need_docker
+    create_env
+    compose up -d --build
+    wait_healthy
+    echo
+    c_ok "Acceso de administración: /login"
+    echo "  Email:      $(env_get ADMIN_EMAIL)"
+    echo "  Contraseña: $(env_get ADMIN_PASSWORD)   (está en .env; cámbiala allí y ejecuta ./codespace restart)"
+}
+
+cmd_update() {
+    need_docker
+    if [[ -d .git ]]; then git pull --ff-only; fi
+    compose up -d --build
+    wait_healthy
+}
+
+cmd_backup() {
+    need_docker
+    mkdir -p backups
+    local stamp tmp file
+    stamp=$(date +%Y%m%d-%H%M%S)
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' RETURN
+
+    compose exec -T mongo sh -c \
+        'mongodump --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db "${MONGO_INITDB_DATABASE:-codespace}" --archive --gzip' \
+        > "$tmp/mongo.archive.gz"
+    compose exec -T app tar -C /app -czf - workspaces-data tickets-data > "$tmp/files.tar.gz"
+
+    file="backups/codespace-${stamp}.tar.gz"
+    tar -C "$tmp" -czf "$file" mongo.archive.gz files.tar.gz
+    chmod 600 "$file"
+    c_ok "Copia creada: $file"
+}
+
+cmd_restore() {
+    need_docker
+    local file=${1:-}
+    [[ -f "$file" ]] || { c_err "Uso: ./codespace restore backups/codespace-AAAAMMDD-HHMMSS.tar.gz"; exit 1; }
+    read -r -p "Se sustituirán los datos actuales por los de $file. ¿Continuar? [s/N] " ok
+    [[ "$ok" =~ ^[sSyY]$ ]] || exit 0
+
+    local tmp; tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' RETURN
+    tar -C "$tmp" -xzf "$file"
+
+    compose exec -T mongo sh -c \
+        'mongorestore --quiet --drop --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip' \
+        < "$tmp/mongo.archive.gz"
+    compose exec -T app sh -c 'rm -rf /app/workspaces-data/* /app/tickets-data/* && tar -C /app -xzf -' < "$tmp/files.tar.gz"
+    compose restart app
+    wait_healthy
+    c_ok "Restauración completada."
+}
+
+case "${1:-}" in
+    install) cmd_install ;;
+    update)  cmd_update ;;
+    up)      need_docker; compose up -d; wait_healthy ;;
+    down)    need_docker; compose down ;;
+    restart) need_docker; compose up -d --force-recreate app; wait_healthy ;;
+    logs)    need_docker; compose logs -f --tail=200 "${2:-app}" ;;
+    status)  need_docker; compose ps ;;
+    backup)  cmd_backup ;;
+    restore) cmd_restore "${2:-}" ;;
+    *)
+        cat <<'USAGE'
+Uso: ./codespace <orden>
+
+  install            Primera instalación (genera .env, construye y arranca)
+  update             Actualiza el código (git pull) y reconstruye
+  up | down          Arranca / para los contenedores
+  restart            Reinicia la aplicación (aplica cambios de .env)
+  logs [app|mongo]   Muestra los registros
+  status             Estado de los contenedores
+  backup             Copia de MongoDB y de los workspaces en ./backups
+  restore <archivo>  Restaura una copia
+USAGE
+        ;;
+esac

@@ -4,6 +4,14 @@ import { isDatabaseConnected } from '../database/connection';
 
 const TICKETS_DIR = path.join(process.cwd(), 'tickets-data');
 
+// El id acaba en un nombre de archivo: solo caracteres seguros
+function safeTicketId(ticketId: string): string {
+    if (typeof ticketId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(ticketId)) {
+        throw new Error('Ticket no válido');
+    }
+    return ticketId;
+}
+
 type TicketResponseRecord = {
     userId: string;
     message: string;
@@ -65,7 +73,7 @@ function normalizeTicket(ticket: any): TicketRecord {
 
 async function readJsonTicket(ticketId: string): Promise<TicketRecord | null> {
     try {
-        const filePath = path.join(TICKETS_DIR, `${ticketId}.json`);
+        const filePath = path.join(TICKETS_DIR, `${safeTicketId(ticketId)}.json`);
         const content = await fs.readFile(filePath, 'utf-8');
         return normalizeTicket(JSON.parse(content));
     } catch {
@@ -74,7 +82,7 @@ async function readJsonTicket(ticketId: string): Promise<TicketRecord | null> {
 }
 
 async function writeJsonTicket(ticketId: string, ticket: TicketRecord): Promise<void> {
-    const filePath = path.join(TICKETS_DIR, `${ticketId}.json`);
+    const filePath = path.join(TICKETS_DIR, `${safeTicketId(ticketId)}.json`);
     await fs.writeFile(filePath, JSON.stringify(ticket, null, 2));
 }
 
@@ -446,7 +454,7 @@ export async function deleteTicket(ticketId: string): Promise<boolean> {
     } else {
         // Usar JSON
         try {
-            const filePath = path.join(TICKETS_DIR, `${ticketId}.json`);
+            const filePath = path.join(TICKETS_DIR, `${safeTicketId(ticketId)}.json`);
             await fs.unlink(filePath);
             return true;
         } catch {

@@ -4,7 +4,8 @@ import path from 'path';
 import archiver from 'archiver';
 import bcrypt from 'bcrypt';
 import { requireAdmin, requireSuperAdmin } from '../middleware/auth';
-import { workspaces, cleanupExpiredWorkspaces, calculateWorkspaceSize, countFiles, onlineUserSockets } from '../services/workspace.service';
+import { workspaces, cleanupExpiredWorkspaces, onlineUserSockets, listAllWorkspaces, saveWorkspace, loadWorkspace } from '../services/workspace.service';
+import { isValidWorkspaceId } from '../utils/validation';
 import { config } from '../config';
 import * as logService from '../services/log.service';
 import * as reportService from '../services/report.service';
@@ -17,28 +18,15 @@ const DATA_DIR = path.join(process.cwd(), config.dataDir);
 // Obtener todos los workspaces
 router.get('/workspaces', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const workspaceList = [];
+        // Incluye los guardados en disco, no solo los cargados en memoria
+        const workspaceList = await listAllWorkspaces();
         let totalStorage = 0;
         let totalUsers = 0;
         let activeNow = 0;
-        
-        for (const [id, workspace] of workspaces.entries()) {
-            const size = calculateWorkspaceSize(workspace.structure);
-            const fileCount = countFiles(workspace.structure);
-            
-            totalStorage += size;
-            totalUsers += workspace.users || 0;
-            if (workspace.users > 0) activeNow++;
-            
-            workspaceList.push({
-                id,
-                size,
-                files: fileCount,
-                users: workspace.users || 0,
-                created: workspace.created || new Date(),
-                lastAccess: workspace.lastAccess || Date.now(),
-                hasPassword: !!workspace.password
-            });
+        for (const ws of workspaceList) {
+            totalStorage += ws.size;
+            totalUsers += ws.users;
+            if (ws.users > 0) activeNow++;
         }
         
         res.json({
@@ -78,15 +66,13 @@ router.get('/user-info', requireAdmin, async (req: Request, res: Response) => {
 router.delete('/workspaces/:id', requireAdmin, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        
-        workspaces.delete(id);
-        
-        const filePath = path.join(DATA_DIR, `${id}.json`);
-        try {
-            await fs.unlink(filePath);
-        } catch (error) {
-            // Archivo no existe
+        if (!isValidWorkspaceId(id)) {
+            return res.status(400).json({ error: 'Workspace no válido' });
         }
+
+        workspaces.delete(id);
+        await fs.rm(path.join(DATA_DIR, `${id}.json`), { force: true });
+        await fs.rm(path.join(DATA_DIR, id), { recursive: true, force: true });
         
         res.json({ success: true });
     } catch (error) {
@@ -344,27 +330,30 @@ router.post('/workspace/password', requireAdmin, async (req: Request, res: Respo
             return res.status(400).json({ error: 'Workspace ID y contraseña son requeridos' });
         }
         
-        const workspace = workspaces.get(workspaceId);
+        if (!isValidWorkspaceId(workspaceId)) {
+            return res.status(400).json({ error: 'Workspace no válido' });
+        }
+        const workspace = workspaces.get(workspaceId) || await loadWorkspace(workspaceId);
         if (!workspace) {
             return res.status(404).json({ error: 'Workspace no encontrado' });
         }
         
-        if (password.length < 4) {
+        if (typeof password !== 'string' || password.length < 4) {
             return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
         }
-        
+
+        const hadPassword = !!workspace.password;
         const hashedPassword = await bcrypt.hash(password, 10);
         workspace.password = hashedPassword;
         
         // Guardar workspace
-        const workspacePath = path.join(DATA_DIR, `${workspaceId}.json`);
-        await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2));
+        await saveWorkspace(workspaceId, workspace);
         
-        console.log(`🔑 [ADMIN] Contraseña ${workspace.password ? 'cambiada' : 'establecida'} para workspace: ${workspaceId}`);
+        console.log(`🔑 [ADMIN] Contraseña ${hadPassword ? 'cambiada' : 'establecida'} para workspace: ${workspaceId}`);
         
         res.json({ 
             success: true, 
-            message: workspace.password ? 'Contraseña cambiada exitosamente' : 'Contraseña establecida exitosamente' 
+            message: hadPassword ? 'Contraseña cambiada exitosamente' : 'Contraseña establecida exitosamente' 
         });
     } catch (error) {
         console.error('Error al establecer contraseña:', error);
@@ -381,7 +370,10 @@ router.delete('/workspace/password', requireAdmin, async (req: Request, res: Res
             return res.status(400).json({ error: 'Workspace ID es requerido' });
         }
         
-        const workspace = workspaces.get(workspaceId);
+        if (!isValidWorkspaceId(workspaceId)) {
+            return res.status(400).json({ error: 'Workspace no válido' });
+        }
+        const workspace = workspaces.get(workspaceId) || await loadWorkspace(workspaceId);
         if (!workspace) {
             return res.status(404).json({ error: 'Workspace no encontrado' });
         }
@@ -393,8 +385,7 @@ router.delete('/workspace/password', requireAdmin, async (req: Request, res: Res
         delete workspace.password;
         
         // Guardar workspace
-        const workspacePath = path.join(DATA_DIR, `${workspaceId}.json`);
-        await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2));
+        await saveWorkspace(workspaceId, workspace);
         
         console.log(`🔓 [ADMIN] Contraseña eliminada del workspace: ${workspaceId}`);
         

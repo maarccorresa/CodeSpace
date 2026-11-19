@@ -1,18 +1,16 @@
 {
   "name": "codespace",
   "version": "1.0.0",
-  "description": "Editor colaborativo de código en tiempo real con terminal Docker integrada y planes de pago",
+  "description": "Editor de código colaborativo en tiempo real",
   "main": "dist/server.js",
   "engines": {
-    "node": "20.x"
+    "node": ">=20"
   },
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
     "build": "tsc",
-    "vercel-build": "tsc",
-    "watch": "tsc --watch",
-    "clean": "rmdir /s /q dist 2>nul || exit 0"
+    "watch": "tsc --watch"
   },
   "keywords": [
     "collaborative",
@@ -30,12 +28,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/c0rresita/CodeSpace.git"
+    "url": "https://github.com/maarccorresa/CodeSpace.git"
   },
   "bugs": {
-    "url": "https://github.com/c0rresita/CodeSpace/issues"
+    "url": "https://github.com/maarccorresa/CodeSpace/issues"
   },
-  "homepage": "https://github.com/c0rresita/CodeSpace#readme",
+  "homepage": "https://github.com/maarccorresa/CodeSpace#readme",
   "dependencies": {
     "archiver": "^7.0.1",
     "bcrypt": "^5.1.1",

@@ -3,344 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeSpace - Editor Colaborativo</title>
-    
-    <!-- Feather Icons -->
-    <script src="https://unpkg.com/feather-icons"></script>
-    
+    <title>CodeSpace — Editor de código colaborativo</title>
+    <meta name="description" content="Editor de código colaborativo en tiempo real: crea un workspace, comparte la URL y programad juntos.">
+    <link rel="icon" href="/img/logo.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="/css/theme.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-            background: #1e1e1e;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            color: #d4d4d4;
-            position: relative;
+            min-height: 100vh; background: var(--cs-bg); color: var(--cs-text);
+            display: flex; flex-direction: column;
         }
-
-        .header-nav {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 100;
+        .topbar {
+            position: relative; z-index: 2;
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 1120px; width: 100%; margin: 0 auto; padding: 20px 24px;
         }
+        .brand-link { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .brand-link img { width: 30px; height: 30px; }
+        .brand-link span { font-weight: 700; font-size: 1.05rem; color: var(--cs-text); letter-spacing: -.01em; }
+        .nav { display: flex; gap: 8px; }
 
-        .nav-btn {
-            background: #2d2d30;
-            border: 1px solid #3e3e42;
-            color: #d4d4d4;
-            padding: 10px 20px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-            font-weight: 500;
+        main {
+            position: relative; z-index: 1; flex: 1;
+            max-width: 1120px; width: 100%; margin: 0 auto; padding: 56px 24px 40px;
+            display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center;
         }
-
-        .nav-btn:hover {
-            background: #3e3e42;
-            border-color: #4ec9b0;
+        .eyebrow {
+            display: block; color: var(--cs-blue);
+            font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+            margin-bottom: 16px;
         }
-
-        .nav-btn.primary {
-            background: #0e639c;
-            border-color: #0e639c;
-            color: #ffffff;
-        }
-
-        .nav-btn.primary:hover {
-            background: #1177bb;
-        }
-
-        .container {
-            background: #2d2d30;
-            padding: 50px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-            border: 1px solid #3e3e42;
-        }
-
+        .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cs-green); box-shadow: 0 0 0 4px rgba(74,222,128,.15); }
         h1 {
-            color: #d4d4d4;
-            margin-bottom: 20px;
-            font-size: 2.5em;
-            font-weight: 300;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
+            font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1.15; letter-spacing: -.02em; font-weight: 600;
         }
-
-        h1 svg {
-            width: 40px;
-            height: 40px;
+        h1 em {
+            font-style: normal;
+            background: linear-gradient(120deg, var(--cs-accent) 10%, var(--cs-cyan) 90%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
         }
+        .lead { margin-top: 18px; color: var(--cs-text-2); font-size: 1.08rem; line-height: 1.6; max-width: 34em; }
 
-        .input-group {
-            margin-bottom: 20px;
+        .open-form { margin-top: 32px; max-width: 480px; }
+        .open-row {
+            display: flex; align-items: center; gap: 0;
+            background: var(--cs-bg-raised); border: 1px solid var(--cs-border-2); border-radius: var(--cs-radius);
+            padding: 5px; transition: border-color .15s, box-shadow .15s;
         }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 15px;
-            font-size: 1em;
-            background: #1e1e1e;
-            border: 1px solid #3e3e42;
-            border-radius: 6px;
-            color: #d4d4d4;
-            outline: none;
-            font-family: inherit;
-            transition: border-color 0.2s;
+        .open-row:focus-within { border-color: var(--cs-accent); box-shadow: var(--cs-ring); }
+        .prefix { padding: 0 2px 0 12px; color: var(--cs-dim); font: 500 .92rem var(--cs-mono); white-space: nowrap; }
+        .open-row input {
+            flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: var(--cs-text);
+            font: 500 .95rem var(--cs-mono); outline: none; box-shadow: none !important;
         }
+        .hint { margin-top: 10px; font-size: .82rem; color: var(--cs-muted); }
+        .hint code { color: var(--cs-text-2); }
 
-        input[type="text"]:focus {
-            border-color: #0e639c;
+        .features { margin-top: 36px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; max-width: 520px; }
+        .feature { display: flex; gap: 10px; align-items: flex-start; font-size: .9rem; color: var(--cs-text-2); line-height: 1.45; }
+        .feature svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; color: var(--cs-accent); }
+
+        /* Vista previa del editor */
+        .preview { overflow: hidden; }
+        .preview-bar { display: flex; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--cs-border); }
+        .preview-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--cs-border-2); }
+        .preview-bar .tab { margin-left: 10px; font: 500 .78rem var(--cs-mono); color: var(--cs-text-2); padding: 4px 10px; border-radius: 6px; background: var(--cs-card); }
+        .preview-bar .people { margin-left: auto; display: flex; }
+        .avatar { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--cs-surface); margin-left: -6px; background: #cbd2dc; }
+        pre.code { padding: 18px 0; font: 400 .84rem/1.75 var(--cs-mono); color: var(--cs-text); overflow-x: auto; }
+        pre.code .ln { display: inline-block; width: 42px; padding-right: 14px; text-align: right; color: var(--cs-dim); user-select: none; }
+        .k { color: #569cd6; } .s { color: #ce9178; } .f { color: #dcdcaa; } .c { color: #6a7380; font-style: italic; } .n { color: #b5cea8; }
+        .cursor { display: inline-block; width: 2px; height: 1.1em; vertical-align: -3px; background: var(--cs-accent); animation: blink 1s steps(1) infinite; position: relative; }
+        .cursor::after { content: 'Ana'; position: absolute; top: -17px; left: 0; font: 600 .62rem var(--cs-font); background: var(--cs-accent); color: #fff; padding: 1px 5px; border-radius: 4px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        footer { position: relative; z-index: 1; text-align: center; padding: 24px; font-size: .8rem; color: var(--cs-dim); }
+        footer a { color: var(--cs-muted); text-decoration: none; }
+        footer a:hover { color: var(--cs-text); }
+
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; padding-top: 24px; gap: 40px; }
+            .preview { display: none; }
         }
-
-        input[type="text"]::placeholder {
-            color: #6e6e6e;
-        }
-
-        p {
-            color: #969696;
-            margin-bottom: 30px;
-            font-size: 1.05em;
-            line-height: 1.6;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        button {
-            flex: 1;
-            min-width: 200px;
-            padding: 16px 32px;
-            font-size: 1em;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        }
-
-        .btn-primary {
-            background: #0e639c;
-            color: #ffffff;
-        }
-
-        .btn-primary:hover {
-            background: #1177bb;
-        }
-
-        .btn-primary:active {
-            background: #0d5a8f;
-        }
-
-        .features {
-            margin-top: 40px;
-            padding-top: 30px;
-            border-top: 1px solid #3e3e42;
-            text-align: left;
-        }
-
-        .feature {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-            color: #969696;
-            font-size: 0.95em;
-        }
-
-        .feature svg {
-            width: 18px;
-            height: 18px;
-            margin-right: 12px;
-            color: #4ec9b0;
-        }
-
-        .subtitle {
-            color: #d4d4d4;
-            font-size: 1.1em;
-            margin-bottom: 20px;
-            font-weight: 400;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 60px;
-            color: #969696;
-            font-size: 0.9em;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(400px);
-                opacity: 0;
-            }
+        @media (max-width: 520px) {
+            .topbar { padding: 16px; }
+            main { padding: 16px 16px 32px; }
+            .features { grid-template-columns: 1fr; }
+            .prefix { display: none; }
+            .nav .cs-btn-ghost { display: none; }
         }
     </style>
 </head>
 <body>
-    <nav id="userNav" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:100;"></nav>
 
-    <div class="container">
-        <h1>
-            <i data-feather="code"></i>
+    <header class="topbar">
+        <a class="brand-link" href="/">
+            <img src="/img/logo.svg" alt="">
             <span>CodeSpace</span>
-        </h1>
-        <p class="subtitle">Editor colaborativo con explorador de archivos</p>
-        <p>Organiza tus documentos en carpetas. Edita en tiempo real con cualquier persona. Sin registro, sin complicaciones.</p>
-        
-        <div class="input-group">
-            <input type="text" id="workspaceName" placeholder="Nombre del workspace (ej: prueba, mi-proyecto)" autocomplete="off">
-        </div>
+        </a>
+        <nav class="nav" id="userNav"></nav>
+    </header>
 
-        <div class="button-group">
-            <button class="btn-primary" onclick="goToWorkspace()">Abrir Workspace</button>
-        </div>
+    <main>
+        <section>
+            <span class="eyebrow">Plataforma de desarrollo colaborativo</span>
+            <h1>Editor de código colaborativo para equipos</h1>
+            <p class="lead">Espacios de trabajo compartidos con edición simultánea, control de acceso por contraseña, chat interno y soporte integrado. Sin instalación en el equipo del usuario.</p>
 
-        <div class="features">
-            <div class="feature">
-                <i data-feather="folder"></i>
-                <span>Explorador de archivos con carpetas</span>
+            <form class="open-form" id="openForm" autocomplete="off">
+                <div class="open-row">
+                    <span class="prefix" id="hostPrefix">codespace/</span>
+                    <input id="workspaceName" name="workspace" placeholder="mi-proyecto" maxlength="64"
+                           spellcheck="false" aria-label="Nombre del espacio de trabajo">
+                    <button type="submit" class="cs-btn cs-btn-primary">
+                        Abrir
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                </div>
+                <p class="hint">Si el espacio de trabajo no existe, se crea. Use letras, números, <code>-</code> y <code>_</code>.</p>
+            </form>
+
+            <div class="features">
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Edición simultánea con presencia de usuarios en tiempo real</span>
+                </div>
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span>Estructura de carpetas, resaltado de sintaxis y exportación ZIP</span>
+                </div>
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Control de acceso por espacio de trabajo y por archivo</span>
+                </div>
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Chat interno y gestión de incidencias integrada</span>
+                </div>
             </div>
-            <div class="feature">
-                <i data-feather="users"></i>
-                <span>Edición colaborativa en tiempo real</span>
+        </section>
+
+        <aside class="preview cs-card" aria-hidden="true">
+            <div class="preview-bar">
+                <i></i><i></i><i></i>
+                <span class="tab">server.js</span>
+                <span class="people">
+                    <img class="avatar" src="/img/avatar-default.svg" alt="">
+                    <img class="avatar" src="/img/avatar-default.svg" alt="">
+                    <img class="avatar" src="/img/avatar-default.svg" alt="">
+                </span>
             </div>
-            <div class="feature">
-                <i data-feather="zap"></i>
-                <span>Sin necesidad de registro</span>
-            </div>
-            <div class="feature">
-                <i data-feather="share-2"></i>
-                <span>Comparte simplemente la URL</span>
-            </div>
-            <div class="feature">
-                <i data-feather="activity"></i>
-                <span>Ver usuarios conectados en vivo</span>
-            </div>
-        </div>
-    </div>
+<pre class="code"><span class="ln">1</span><span class="k">import</span> express <span class="k">from</span> <span class="s">'express'</span>;
+<span class="ln">2</span>
+<span class="ln">3</span><span class="k">const</span> app = <span class="f">express</span>();
+<span class="ln">4</span><span class="c">// Endpoint de estado del servicio</span>
+<span class="ln">5</span>app.<span class="f">get</span>(<span class="s">'/estado'</span>, (req, res) =&gt; {
+<span class="ln">6</span>    res.<span class="f">json</span>({ estado: <span class="s">'ok'</span><span class="cursor"></span> });
+<span class="ln">7</span>});
+<span class="ln">8</span>
+<span class="ln">9</span>app.<span class="f">listen</span>(<span class="n">3000</span>);</pre>
+        </aside>
+    </main>
+
+    <footer>CodeSpace · <a href="/login">Administración</a></footer>
 
     <script>
-        // Inicializar Feather Icons
-        feather.replace();
-        
-        const workspaceInput = document.getElementById('workspaceName');
+        const input = document.getElementById('workspaceName');
+        document.getElementById('hostPrefix').textContent = location.host + '/';
 
-        // Enter para abrir workspace
-        workspaceInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                goToWorkspace();
-            }
-        });
-
-        // Sistema de notificaciones toast
-        function showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            const bgColor = type === 'success' ? '#4ec9b0' : type === 'error' ? '#f48771' : type === 'warning' ? '#dcdcaa' : '#4fc3f7';
-            
-            toast.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${bgColor};
-                color: #1e1e1e;
-                padding: 15px 25px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                font-size: 0.95em;
-                font-weight: 500;
-                z-index: 10000;
-                animation: slideIn 0.3s ease-out;
-            `;
-            toast.textContent = message;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideOut 0.3s ease-out';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+        function toast(message, type) {
+            const el = document.createElement('div');
+            el.className = 'cs-toast ' + (type || '');
+            el.textContent = message;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
         }
 
-        function goToWorkspace() {
-            const workspaceName = workspaceInput.value.trim();
-            if (!workspaceName) {
-                showToast('Por favor, ingresa un nombre para el workspace', 'warning');
+        document.getElementById('openForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const clean = input.value.trim()
+                .replace(/[^a-zA-Z0-9_-]+/g, '-')
+                .replace(/^[-_]+/, '')
+                .slice(0, 64);
+            if (!clean) {
+                toast('Introduzca un nombre para el espacio de trabajo', 'error');
+                input.focus();
                 return;
             }
-            
-            // Limpiar el nombre (remover caracteres especiales)
-            const cleanName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-');
-            
-            window.location.href = `/${cleanName}`;
-        }
+            location.href = '/' + encodeURIComponent(clean);
+        });
 
-        // Auto-focus en el input
-        workspaceInput.focus();
+        input.focus();
 
-        // ── User nav ──────────────────────────────
-        const navStyle = 'display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:0.84em;font-weight:600;cursor:pointer;text-decoration:none;border:none;';
-        (async function loadUserNav() {
+        // Navegación según la sesión (texto con textContent: sin HTML del usuario)
+        (async function () {
             const nav = document.getElementById('userNav');
+            const link = (href, text, cls) => {
+                const a = document.createElement('a');
+                a.href = href; a.textContent = text; a.className = 'cs-btn cs-btn-sm ' + cls;
+                return a;
+            };
             try {
                 const res = await fetch('/api/user/me');
                 if (res.ok) {
                     const u = await res.json();
-                    nav.innerHTML =
-                        '<a href="/dashboard" style="' + navStyle + 'background:#1c2128;color:#4ec9b0;border:1px solid #30363d;">' +
-                            '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' +
-                            u.username +
-                        '</a>';
+                    nav.append(link('/dashboard', u.nickname || u.username, 'cs-btn-primary'));
                 } else {
-                    nav.innerHTML =
-                        '<a href="/signin" style="' + navStyle + 'background:#1c2128;color:#e6edf3;border:1px solid #30363d;">' +
-                            'Iniciar sesión' +
-                        '</a>' +
-                        '<a href="/signin?tab=register" style="' + navStyle + 'background:#4ec9b0;color:#0f1117;">' +
-                            'Registrarse' +
-                        '</a>';
+                    nav.append(link('/signin', 'Iniciar sesión', 'cs-btn-ghost'),
+                               link('/signin?tab=register', 'Crear cuenta', ''));
                 }
-            } catch {}
+            } catch { /* sin conexión: la portada funciona igual */ }
         })();
     </script>
 </body>

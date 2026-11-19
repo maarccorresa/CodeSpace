@@ -4,13 +4,14 @@
 
 ![CodeSpace](https://img.shields.io/badge/CodeSpace-Collaborative%20Editor-4ec9b0?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TypeScript-100%25-3178C6?style=for-the-badge&logo=typescript)
-![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js)
 ![Socket.io](https://img.shields.io/badge/Socket.io-Real--time-010101?style=for-the-badge&logo=socket.io)
-![MongoDB](https://img.shields.io/badge/MongoDB-Optional-47A248?style=for-the-badge&logo=mongodb)
+![MongoDB](https://img.shields.io/badge/MongoDB-Docker-47A248?style=for-the-badge&logo=mongodb)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 
 **Editor colaborativo en tiempo real con explorador de archivos, chat persistente y sistema de workspaces**
 
-[Características](#-características) • [Instalación](#-instalación-rápida) • [Uso](#-uso) • [Tecnologías](#️-tecnologías)
+[Características](#-características) • [Instalación](#-instalación-docker) • [Uso](#-uso) • [Tecnologías](#️-tecnologías)
 
 </div>
 
@@ -39,96 +40,78 @@
 - **⚡ Sesiones Únicas**: Sistema de sesiones para identificar usuarios únicos
 - **🧹 Limpieza Automática**: Workspaces inactivos se eliminan automáticamente (configurable)
 - **🌓 Tema Claro/Oscuro**: Cambia entre temas con persistencia
+- **🏢 Diseño corporativo**: Paleta gris pizarra con azul corporativo, sin degradados, tipografía Inter / JetBrains Mono
+- **👤 Avatar por defecto**: Silueta genérica de persona para todos los usuarios
+- **🙋 Invitados**: Quien entra sin nombre aparece como `Invitado-xxxx` en la lista de conectados
 
 ---
 
-## 🚀 Instalación Rápida
+## 🚀 Instalación (Docker)
 
-### Requisitos Previos
+La aplicación y la base de datos (MongoDB) se ejecutan en contenedores. No hace falta instalar Node.js ni MongoDB en el servidor.
 
-- **Node.js** 18 o superior
-- **npm** o **yarn**
-- **MongoDB** (opcional, para persistencia de chat)
+### Requisitos
 
-### Pasos de Instalación
+- Linux con **Docker** y el plugin **docker compose** (v2). En Ubuntu/Debian: `curl -fsSL https://get.docker.com | sh`
+- 1 GB de RAM libre como mínimo.
 
-1. **Clonar el repositorio**
+### Pasos
+
 ```bash
-git clone https://github.com/c0rresita/CodeSpace
+git clone https://github.com/maarccorresa/CodeSpace.git
 cd CodeSpace
+./codespace install
 ```
 
-2. **Instalar dependencias**
+`./codespace install`:
+1. Pregunta el email del administrador y el puerto (por defecto `3000`).
+2. Crea `.env` con claves aleatorias: secreto de sesión, contraseña de MongoDB y contraseña del administrador.
+3. Construye la imagen y arranca dos contenedores: `app` y `mongo`.
+4. Espera a que la aplicación responda y muestra la URL y los datos de acceso a `/login`.
+
+MongoDB no publica ningún puerto: solo la aplicación llega a él. Los datos se guardan en volúmenes de Docker (`mongo-data`, `workspaces`, `tickets`), así que sobreviven a reinicios y actualizaciones.
+
+### Órdenes de gestión
+
+| Orden | Qué hace |
+|---|---|
+| `./codespace install` | Primera instalación |
+| `./codespace update` | `git pull` y reconstruye la imagen |
+| `./codespace up` / `down` | Arranca / para los contenedores |
+| `./codespace restart` | Reinicia la aplicación (aplica cambios de `.env`) |
+| `./codespace logs [app\|mongo]` | Registros en directo |
+| `./codespace status` | Estado de los contenedores |
+| `./codespace backup` | Copia de MongoDB y de los workspaces en `./backups` |
+| `./codespace restore <archivo>` | Restaura una copia |
+
+### Configuración (`.env`)
+
+| Variable | Para qué sirve |
+|---|---|
+| `APP_PORT` | Puerto publicado en el equipo (por defecto `3000`) |
+| `APP_BIND` | `0.0.0.0` (todas las interfaces) o `127.0.0.1` si hay un proxy delante |
+| `SESSION_SECRET` | Secreto de las cookies de sesión (32 caracteres o más) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Administrador principal (contraseña de 8 caracteres o más) |
+| `MONGO_USER` / `MONGO_PASSWORD` / `MONGO_DB` | Credenciales de MongoDB en Docker |
+| `COOKIE_SECURE` | `true` si se sirve por HTTPS |
+| `TRUST_PROXY` | `true` si hay un proxy (nginx, Traefik…) que envía `X-Forwarded-For` |
+| `WORKSPACE_EXPIRY_DAYS` | Días sin uso tras los que se borra un workspace (por defecto 30) |
+
+En producción la aplicación **no arranca** con el secreto o la contraseña de ejemplo.
+
+### HTTPS
+
+La aplicación sirve HTTP en el puerto 3000. Para HTTPS, pon delante un proxy (nginx, Caddy, Traefik) con `APP_BIND=127.0.0.1`, `TRUST_PROXY=true` y `COOKIE_SECURE=true`. El proxy debe reenviar WebSocket (`Upgrade`/`Connection`) para Socket.IO.
+
+### Desarrollo sin Docker
+
 ```bash
 npm install
+cp .env.example .env     # y ajusta MONGO_URI si tienes un MongoDB local
+npm run dev
 ```
 
-3. **Configurar variables de entorno**
-
-Crea un archivo `.env` en la raíz del proyecto:
-
-```env
-# Puerto del servidor
-PORT=3000
-
-# Seguridad
-SESSION_SECRET=codespace-secret-key-production-2025
-
-# Credenciales de administrador
-ADMIN_EMAIL=admin@admin.com
-ADMIN_PASSWORD=admin123
-
-# Base de datos MongoDB (opcional)
-# Si no se configura, el chat se guardará en archivos JSON
-# MONGO_URI=mongodb://localhost:27017/codespace
-
-# Limpieza automática
-CLEANUP_INTERVAL_DAYS=1
-WORKSPACE_EXPIRY_DAYS=30
-```
-
-4. **Compilar TypeScript**
-```bash
-npm run build
-```
-
-5. **Iniciar el servidor**
-```bash
-npm start
-```
-
-6. **Acceder a la aplicación**
-```
-http://localhost:3000
-```
-
-### 🐳 Instalación con MongoDB (Opcional)
-
-**Opción 1: MongoDB Local**
-```bash
-# Windows (con Chocolatey)
-choco install mongodb
-
-# Mac (con Homebrew)
-brew install mongodb-community
-
-# Linux (Ubuntu/Debian)
-sudo apt install mongodb
-```
-
-**Opción 2: MongoDB con Docker**
-```bash
-docker run -d -p 27017:27017 --name mongodb mongo
-```
-
-**Opción 3: MongoDB Atlas (Cloud Gratis)**
-1. Crea cuenta en https://www.mongodb.com/cloud/atlas
-2. Crea un cluster gratuito (M0)
-3. Obtén tu URI de conexión
-4. Configura en `.env`:
-```env
-MONGO_URI=mongodb+srv://usuario:password@cluster.mongodb.net/codespace
-```
+Sin `MONGO_URI`, la aplicación funciona en modo archivos (JSON en `workspaces-data/`). Este modo solo se acepta fuera de producción.
 
 ---
 
@@ -189,9 +172,7 @@ MONGO_URI=mongodb+srv://usuario:password@cluster.mongodb.net/codespace
 
 ### 6️⃣ Panel de Administración
 
-Accede a `http://localhost:3000/login` con:
-- **Email**: `admin@admin.com`
-- **Contraseña**: `admin123`
+Accede a `http://<servidor>:3000/login` con `ADMIN_EMAIL` y `ADMIN_PASSWORD` del archivo `.env` (`./codespace install` los muestra al terminar).
 
 **Funcionalidades del Administrador:**
 - **Workspaces**: Ver, editar contraseñas, eliminar workspaces
@@ -227,8 +208,8 @@ Accede a `http://localhost:3000/login` con:
 ### Frontend
 - **Vanilla JavaScript** - Sin frameworks pesados
 - **CodeMirror 5** - Editor de código profesional
-- **Feather Icons** - Iconografía moderna
-- **CSS3** - Diseño responsive
+- **Feather Icons** - Iconografía
+- **Tema común** (`public/css/theme.css`) - Paleta corporativa (gris pizarra y azul `#2563eb`), tipografía Inter / JetBrains Mono y tema claro en el editor
 
 ### Persistencia
 - **Archivos JSON** - Sistema de archivos para workspaces
@@ -247,57 +228,51 @@ Accede a `http://localhost:3000/login` con:
 ## 📁 Estructura del Proyecto
 
 ```
-share-code/
-├── src/                      # Código fuente TypeScript
-│   ├── config/              # Configuración
-│   ├── database/            # Conexión MongoDB
-│   ├── middleware/          # Middlewares Express
+CodeSpace/
+├── codespace                # Script de gestión (install, update, backup…)
+├── Dockerfile               # Imagen de la aplicación (Node 20, usuario sin privilegios)
+├── compose.yaml             # Servicios: app + mongo
+├── .env.example             # Plantilla de configuración
+├── src/                     # Código fuente TypeScript
+│   ├── config/              # Configuración y comprobaciones de arranque
+│   ├── database/            # Conexión a MongoDB (con reintentos)
+│   ├── middleware/          # Permisos de administración
 │   ├── models/              # Modelos Mongoose
-│   ├── routes/              # Rutas de la API
+│   ├── routes/              # API REST
 │   ├── services/            # Lógica de negocio
-│   ├── socket/              # Manejadores Socket.IO
-│   ├── types/               # Tipos TypeScript
+│   ├── socket/              # Eventos en tiempo real (Socket.IO)
+│   ├── utils/               # Validación, control de acceso y límite de intentos
 │   └── server.ts            # Punto de entrada
-├── dist/                     # Código compilado (JavaScript)
-├── public/                   # Frontend estáticos
-│   ├── index.html           # Página de inicio
-│   ├── workspace.html       # Editor principal
-│   ├── admin.html           # Panel de administración
-│   ├── login.html  # Login admin
-│   └── js/
-│       └── workspace.js     # Lógica del editor
-├── workspaces-data/         # Datos persistentes
-│   ├── [workspace-id]/      # Un directorio por workspace
-│   │   ├── files.json       # Estructura de archivos
-│   │   ├── metadata.json    # Metadatos del workspace
-│   │   └── chat.json        # Historial de chat (si no hay MongoDB)
-│   └── moderators.json      # Cuentas de moderadores
-├── .env                     # Variables de entorno
-├── .env.example             # Ejemplo de configuración
-├── package.json             # Dependencias
-├── tsconfig.json            # Configuración TypeScript
-├── .gitignore               # Archivos ignorados por Git
-└── README.md                # Esta documentación
+└── public/                  # Frontend
+    ├── index.html           # Portada
+    ├── workspace.html       # Editor
+    ├── dashboard.html       # Área de usuario
+    ├── signin.html          # Acceso y registro de usuarios
+    ├── login.html           # Acceso de administración
+    ├── admin.html           # Panel de administración
+    ├── css/theme.css        # Tema común de todas las pantallas
+    ├── img/                 # Logo y avatar por defecto
+    └── js/workspace.js      # Lógica del editor
 ```
+
+Datos en Docker (volúmenes): `mongo-data` (MongoDB), `workspaces` (`/app/workspaces-data`, un JSON por workspace) y `tickets` (`/app/tickets-data`).
 
 ---
 
 ## 🔐 Seguridad
 
-- **Contraseñas cifradas** con bcrypt (salt rounds: 10)
-  - Contraseñas de archivos protegidos
-  - Contraseñas de workspaces
-  - Contraseñas de moderadores
-- **Sesiones seguras** con express-session y secretos configurables
-- **Protección multinivel**:
-  - Archivos individuales con contraseña
-  - Workspaces completos con contraseña
-- **Control de acceso basado en roles**:
-  - Administrador principal (acceso completo)
-  - Moderadores (gestión de tickets y estadísticas)
-- **Validación de entrada** en todos los endpoints
-- **Sin autenticación requerida** para usuarios finales (modo anónimo)
-- **Panel admin protegido** con credenciales
+- Contraseñas con **bcrypt** (workspaces, archivos, usuarios y moderadores).
+- **Sesiones en MongoDB**, cookie `httpOnly` y `SameSite=Lax`; la sesión se renueva al identificarse.
+- **Límite de intentos** en los inicios de sesión y en la verificación de contraseñas de workspace (respuesta `429`).
+- **Validación del nombre del workspace** (`A-Z a-z 0-9 - _`, máx. 64): no se pueden usar rutas (`../`) ni nombres internos (`users`, `moderators`…).
+- **Nombres de archivo validados**: se rechazan `__proto__`, `constructor`, `/` y similares.
+- **Eventos en tiempo real autorizados**: solo actúa sobre un workspace quien ha entrado en él (con su contraseña, si la tiene).
+- **Archivos protegidos**: su contenido y su hash no se envían a nadie que no los haya desbloqueado, ni se incluyen en el ZIP.
+- **Expulsar** solo lo pueden hacer el propietario del workspace, administradores y moderadores; **banear**, solo administradores y moderadores.
+- El ZIP y el historial de chat de un workspace protegido solo se sirven a quien lo ha desbloqueado.
+- Textos de usuarios (tickets, nombres, archivos, motivos de bloqueo) escapados antes de mostrarse en el panel y en el editor.
+- Cabeceras `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y `Permissions-Policy`.
+- El contenedor de la aplicación se ejecuta sin privilegios (usuario `node`).
 
 ---
 
@@ -343,53 +318,15 @@ Los workspaces inactivos se eliminan automáticamente:
 
 ---
 
-## 🚀 Comandos Útiles
+## 🚀 Comandos útiles (sin Docker)
 
 ```bash
-# Desarrollo
-npm run dev          # Modo desarrollo con ts-node-dev
-
-# Producción
-npm run build        # Compilar TypeScript a JavaScript
-npm start            # Iniciar servidor desde dist/
-
-# Utilidades
-npm run watch        # Compilar en modo observación
-npm run clean        # Limpiar directorio dist/
+npm run dev      # Desarrollo con ts-node
+npm run build    # Compilar TypeScript a dist/
+npm start        # Ejecutar dist/server.js
 ```
 
----
-
-## 🌐 Despliegue en Producción
-
-### Variables de Entorno Recomendadas
-
-```env
-PORT=3000
-SESSION_SECRET=genera-un-secreto-muy-seguro-aqui
-ADMIN_EMAIL=tu-email@ejemplo.com
-ADMIN_PASSWORD=contraseña-segura
-MONGO_URI=mongodb+srv://usuario:pass@cluster.mongodb.net/codespace
-CLEANUP_INTERVAL_DAYS=1
-WORKSPACE_EXPIRY_DAYS=30
-```
-
-### Plataformas Compatibles
-
-- **Heroku** - Con MongoDB Atlas
-- **Railway** - Configuración automática
-- **Render** - Free tier disponible
-- **DigitalOcean** - VPS con Node.js
-- **AWS EC2** - Servidor dedicado
-- **Vercel** - Con configuración adicional (serverless)
-
-### Pasos Generales
-
-1. Configurar variables de entorno en la plataforma
-2. Conectar repositorio de GitHub
-3. Configurar comando de build: `npm run build`
-4. Configurar comando de start: `npm start`
-5. Establecer MongoDB Atlas URI (recomendado)
+Para producción, usa Docker (ver [Instalación](#-instalación-docker)).
 
 ---
 
@@ -416,7 +353,7 @@ Este proyecto está bajo la Licencia MIT.
 **c0rresita**
 
 - GitHub: [@c0rresita](https://github.com/c0rresita)
-- Repositorio: [CodeSpace](https://github.com/c0rresita/CodeSpace)
+- Repositorio: [CodeSpace](https://github.com/maarccorresa/CodeSpace)
 
 <div align="center">
 

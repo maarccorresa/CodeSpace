@@ -1,9 +1,42 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import bcrypt from 'bcrypt';
-import { workspaces, saveWorkspace, getFileByPath, initWorkspace, onlineUserSockets } from '../services/workspace.service';
+import { workspaces, saveWorkspace, scheduleSave, getFileByPath, initWorkspace, onlineUserSockets } from '../services/workspace.service';
 import { chatService } from '../services/chat.service';
 import * as logService from '../services/log.service';
 import * as userService from '../services/user.service';
+import { isValidItemName, isValidItemPath, isValidWorkspaceId } from '../utils/validation';
+import { config } from '../config';
+
+const MAX_CHAT_LENGTH = 2000;
+const MAX_USERNAME_LENGTH = 40;
+
+function clientIP(socket: Socket): string {
+    if (config.trustProxy) {
+        const fwd = socket.handshake.headers['x-forwarded-for'];
+        const first = (Array.isArray(fwd) ? fwd[0] : fwd || '').split(',')[0].trim();
+        if (first) return first;
+    }
+    return socket.handshake.address;
+}
+
+// Estructura que se envía a los clientes: sin hashes y sin el contenido de los archivos protegidos
+function publicStructure(node: any): any {
+    const out: any = {};
+    for (const [name, item] of Object.entries<any>(node || {})) {
+        if (item?.type === 'folder') {
+            out[name] = { type: 'folder', children: publicStructure(item.children) };
+        } else if (item?.type === 'file') {
+            out[name] = item.passwordHash
+                ? { type: 'file', hasPassword: true }
+                : { type: 'file', content: item.content || '' };
+        }
+    }
+    return out;
+}
+
+function cleanName(value: unknown): string {
+    return typeof value === 'string' ? value.trim().slice(0, MAX_USERNAME_LENGTH) : '';
+}
 
 export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any): void {
     // Usar sesión en WebSocket
@@ -25,13 +58,47 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             }
             onlineUserSockets.get(connectedUserId)!.add(socket.id);
         }
-        const userIP = socket.handshake.headers['x-forwarded-for'] as string || socket.handshake.address;
+        const userIP = clientIP(socket);
+        const session = (socket.request as any).session;
+        const isPrivileged = () => session?.isAdmin === true || session?.isModerator === true;
+
+        // Solo se puede actuar sobre el workspace al que se ha entrado
+        // (join-workspace comprueba IP bloqueada y contraseña).
+        const joined = (workspaceId: unknown): workspaceId is string =>
+            typeof workspaceId === 'string' && currentWorkspace === workspaceId && socket.rooms.has(workspaceId);
+
+        // Archivos con contraseña que este socket ha desbloqueado
+        const unlockedFiles = new Set<string>();
+        socket.data.unlockedFiles = unlockedFiles;
+
+        const isOwner = (workspaceId: string) => {
+            const ws = workspaces.get(workspaceId);
+            return !!(ws?.ownerId && session?.userId && ws.ownerId === session.userId);
+        };
+
+        // Recuerda en la sesión los workspaces desbloqueados (para exportar ZIP y leer el chat por HTTP)
+        const rememberUnlocked = (workspaceId: string) => {
+            if (!session) return;
+            const list: string[] = Array.isArray(session.unlockedWorkspaces) ? session.unlockedWorkspaces : [];
+            if (!list.includes(workspaceId)) {
+                list.push(workspaceId);
+                session.unlockedWorkspaces = list.slice(-100);
+                session.save?.(() => {});
+            }
+        };
         const userAgent = socket.handshake.headers['user-agent'];
 
         // Unirse a un workspace
-        socket.on('join-workspace', async ({ workspaceId, password }) => {
+        socket.on('join-workspace', async ({ workspaceId, password } = {} as any) => {
+            if (!isValidWorkspaceId(workspaceId)) {
+                socket.emit('workspace-error', { error: 'invalid_workspace' });
+                return;
+            }
+            if (currentWorkspace && currentWorkspace !== workspaceId) {
+                socket.leave(currentWorkspace);
+            }
             currentWorkspace = workspaceId;
-            
+
             // Verificar si la IP está bloqueada
             const isBlocked = await logService.isIPBlocked(userIP);
             if (isBlocked) {
@@ -39,7 +106,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 await logService.logAccess({
                     ip: userIP,
                     workspaceId,
-                    userId: socket.id,
+                    userId: session?.userId || socket.id,
                     sessionId,
                     action: 'join',
                     userAgent
@@ -48,10 +115,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             }
 
             // Los admins y moderadores pasan sin contraseña
-            const session = (socket.request as any).session;
-            const isPrivileged = session?.isAdmin === true || session?.isModerator === true;
-            
-            const workspace = await initWorkspace(workspaceId, password, isPrivileged);
+            const workspace = await initWorkspace(workspaceId, password, isPrivileged());
             
             // Verificar si hay error de contraseña
             if ('error' in workspace) {
@@ -60,7 +124,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                     await logService.logAccess({
                         ip: userIP,
                         workspaceId,
-                        userId: socket.id,
+                        userId: session?.userId || socket.id,
                         sessionId,
                         action: 'password_attempt',
                         userAgent
@@ -74,14 +138,15 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             await logService.logAccess({
                 ip: userIP,
                 workspaceId,
-                userId: socket.id,
+                userId: session?.userId || socket.id,
                 sessionId,
                 action: 'join',
                 userAgent
             });
             
             socket.join(workspaceId);
-            
+            rememberUnlocked(workspaceId);
+
             // Rastrear usuarios únicos por sesión
             if (!workspace.uniqueUsers) {
                 workspace.uniqueUsers = new Set();
@@ -106,7 +171,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 workspace.connectedUsers = new Map();
             }
 
-            socket.emit('load-structure', workspace.structure);
+            socket.emit('load-structure', publicStructure(workspace.structure));
 
             // Seguimiento de propiedad / participación para usuarios autenticados
             const userSession = (socket.request as any).session;
@@ -137,15 +202,17 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Establecer nombre de usuario
         socket.on('set-username', ({ workspaceId, username }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
             const workspace = workspaces.get(workspaceId)!;
             if (!workspace.connectedUsers) {
                 workspace.connectedUsers = new Map();
             }
             
+            // Sin nombre elegido: nombre de invitado para que aparezca en la lista
+            username = cleanName(username) || `Invitado-${socket.id.slice(0, 4)}`;
             workspace.connectedUsers.set(socket.id, username);
-            
+
             // Filtrar usuarios en modo vanish
             const usersList = Array.from(workspace.connectedUsers.entries())
                 .filter(([id]) => !workspace.vanishedUsers || !workspace.vanishedUsers.has(id))
@@ -164,11 +231,13 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Cambiar nombre de usuario
         socket.on('username-change', ({ workspaceId, oldUsername, newUsername }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
             const workspace = workspaces.get(workspaceId)!;
             if (!workspace.connectedUsers) return;
             
+            newUsername = cleanName(newUsername);
+            if (!newUsername) return;
             workspace.connectedUsers.set(socket.id, newUsername);
             
             // Actualizar lista de usuarios solo (sin notificar el cambio de nombre) y filtrar vanished
@@ -189,11 +258,18 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Kick user
         socket.on('kick-user', ({ workspaceId, kickedBy, targetUser, message }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
+            if (!isPrivileged() && !isOwner(workspaceId)) {
+                socket.emit('chat-system', { message: 'Solo el propietario del workspace, administradores y moderadores pueden expulsar' });
+                return;
+            }
+
             const workspace = workspaces.get(workspaceId)!;
             if (!workspace.connectedUsers) return;
-            
+            kickedBy = workspace.connectedUsers.get(socket.id) || 'Moderación';
+            message = typeof message === 'string' ? message.slice(0, 200) : '';
+
             // Buscar el socketId del usuario a expulsar
             let targetSocketId: string | null = null;
             for (const [socketId, username] of workspace.connectedUsers.entries()) {
@@ -228,11 +304,18 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Ban user (solo admin/moderador)
         socket.on('ban-user', async ({ workspaceId, bannedBy, targetUser, reason }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
+            if (!isPrivileged()) {
+                socket.emit('chat-system', { message: 'Solo administradores y moderadores pueden banear' });
+                return;
+            }
+
             const workspace = workspaces.get(workspaceId)!;
             if (!workspace.connectedUsers) return;
-            
+            bannedBy = session?.userEmail || workspace.connectedUsers.get(socket.id) || 'Moderación';
+            reason = typeof reason === 'string' && reason.trim() ? reason.slice(0, 200) : 'Sin especificar';
+
             // Buscar el socketId del usuario a banear
             let targetSocketId: string | null = null;
             for (const [socketId, username] of workspace.connectedUsers.entries()) {
@@ -248,7 +331,11 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             const targetSocket = io.sockets.sockets.get(targetSocketId);
             if (!targetSocket) return;
             
-            const targetIP = targetSocket.handshake.headers['x-forwarded-for'] as string || targetSocket.handshake.address;
+            const targetIP = clientIP(targetSocket);
+            if (targetIP === userIP) {
+                socket.emit('chat-system', { message: 'No puedes banear tu propia IP' });
+                return;
+            }
             
             // Bloquear la IP
             await logService.blockIP(targetIP, reason, bannedBy);
@@ -273,7 +360,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Toggle modo vanish (solo admin/moderador)
         socket.on('toggle-vanish', ({ workspaceId, username }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
             // Verificar permisos de admin/moderador
             const session = (socket.request as any).session;
@@ -314,7 +401,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Desbanear IP (solo admin/moderador)
         socket.on('unban-ip', async ({ workspaceId, unbannedBy, ipAddress }) => {
-            if (!workspaces.has(workspaceId)) return;
+            if (!joined(workspaceId) || !workspaces.has(workspaceId)) return;
             
             // Verificar permisos de admin/moderador
             const session = (socket.request as any).session;
@@ -323,6 +410,8 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 return;
             }
             
+            if (typeof ipAddress !== 'string' || !ipAddress) return;
+            unbannedBy = session?.userEmail || 'Moderación';
             try {
                 // Desbloquear la IP
                 await logService.unblockIP(ipAddress);
@@ -348,7 +437,11 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Mensaje de chat
         socket.on('chat-message', async ({ workspaceId, username, message, timestamp }) => {
-            const data = { username, message, timestamp };
+            if (!joined(workspaceId)) return;
+            if (typeof message !== 'string' || !message.trim()) return;
+            message = message.slice(0, MAX_CHAT_LENGTH);
+            username = workspaces.get(workspaceId)?.connectedUsers?.get(socket.id) || cleanName(username) || 'Anónimo';
+            const data = { username, message, timestamp: Date.now() };
             
             // Guardar en base de datos si está disponible
             await chatService.saveMessage(workspaceId, username, message, socket.id);
@@ -362,17 +455,22 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Indicador de escritura
         socket.on('typing', ({ workspaceId, username, isTyping }) => {
+            if (!joined(workspaceId)) return;
+            username = workspaces.get(workspaceId)?.connectedUsers?.get(socket.id) || cleanName(username);
+            isTyping = !!isTyping;
             socket.to(workspaceId).emit('typing', { username, isTyping });
         });
 
         // Obtener historial de chat al unirse
         socket.on('get-chat-history', async ({ workspaceId }) => {
+            if (!joined(workspaceId)) return;
             const messages = await chatService.getWorkspaceMessages(workspaceId);
             socket.emit('chat-history', messages);
         });
 
         // Abrir archivo
         socket.on('open-file', ({ workspaceId, path }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
@@ -391,6 +489,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Establecer contraseña en archivo
         socket.on('set-file-password', async ({ workspaceId, path, password }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
@@ -405,12 +504,17 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                     return;
                 }
 
+                if (typeof password !== 'string' || password.length < 4) {
+                    socket.emit('file-password-set', { path, success: false, error: 'La contraseña debe tener al menos 4 caracteres' });
+                    return;
+                }
                 const hash = await bcrypt.hash(password, 10);
                 file.passwordHash = hash;
+                unlockedFiles.add(path);
                 file.hasPassword = true;
 
                 await saveWorkspace(workspaceId, workspace);
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 
                 socket.emit('file-password-set', { path, success: true });
             }
@@ -418,6 +522,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Quitar contraseña de archivo
         socket.on('remove-file-password', async ({ workspaceId, path, password }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
@@ -432,7 +537,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                     return;
                 }
 
-                const match = await bcrypt.compare(password, file.passwordHash);
+                const match = typeof password === 'string' && await bcrypt.compare(password, file.passwordHash);
                 if (!match) {
                     socket.emit('file-password-removed', { 
                         path, 
@@ -446,7 +551,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 delete file.hasPassword;
 
                 await saveWorkspace(workspaceId, workspace);
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 
                 socket.emit('file-password-removed', { path, success: true });
             }
@@ -454,6 +559,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Desbloquear archivo con contraseña
         socket.on('unlock-file', async ({ workspaceId, path, password }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
@@ -468,7 +574,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                     return;
                 }
 
-                const match = await bcrypt.compare(password, file.passwordHash);
+                const match = typeof password === 'string' && await bcrypt.compare(password, file.passwordHash);
                 if (!match) {
                     socket.emit('file-unlocked', { 
                         path, 
@@ -478,6 +584,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                     return;
                 }
 
+                unlockedFiles.add(path);
                 socket.emit('file-unlocked', {
                     path,
                     content: file.content || '',
@@ -488,9 +595,14 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Establecer contraseña del workspace
         socket.on('set-workspace-password', async ({ workspaceId, password }) => {
-            const workspace = workspaces.get(workspaceId);
+            const workspace = joined(workspaceId) ? workspaces.get(workspaceId) : undefined;
             if (!workspace) {
                 socket.emit('workspace-password-error', { message: 'Workspace no encontrado' });
+                return;
+            }
+
+            if (workspace.ownerId && !isOwner(workspaceId) && !isPrivileged()) {
+                socket.emit('workspace-password-error', { message: 'Solo el propietario del workspace puede ponerle contraseña' });
                 return;
             }
 
@@ -499,7 +611,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 return;
             }
 
-            if (!password || password.length < 4) {
+            if (typeof password !== 'string' || password.length < 4) {
                 socket.emit('workspace-password-error', { message: 'La contraseña debe tener al menos 4 caracteres' });
                 return;
             }
@@ -520,7 +632,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Quitar contraseña del workspace
         socket.on('remove-workspace-password', async ({ workspaceId, password }) => {
-            const workspace = workspaces.get(workspaceId);
+            const workspace = joined(workspaceId) ? workspaces.get(workspaceId) : undefined;
             if (!workspace) {
                 socket.emit('workspace-password-error', { message: 'Workspace no encontrado' });
                 return;
@@ -532,7 +644,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             }
 
             try {
-                const match = await bcrypt.compare(password, workspace.password);
+                const match = typeof password === 'string' && await bcrypt.compare(password, workspace.password);
                 if (!match) {
                     socket.emit('workspace-password-error', { message: 'Contraseña incorrecta' });
                     return;
@@ -552,7 +664,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Cambiar contraseña del workspace
         socket.on('change-workspace-password', async ({ workspaceId, currentPassword, newPassword }) => {
-            const workspace = workspaces.get(workspaceId);
+            const workspace = joined(workspaceId) ? workspaces.get(workspaceId) : undefined;
             if (!workspace) {
                 socket.emit('workspace-password-error', { message: 'Workspace no encontrado' });
                 return;
@@ -568,14 +680,14 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 return;
             }
 
-            if (newPassword.length < 4) {
+            if (typeof newPassword !== 'string' || newPassword.length < 4) {
                 socket.emit('workspace-password-error', { message: 'La nueva contraseña debe tener al menos 4 caracteres' });
                 return;
             }
 
             try {
                 // Verificar contraseña actual
-                const match = await bcrypt.compare(currentPassword, workspace.password);
+                const match = typeof currentPassword === 'string' && await bcrypt.compare(currentPassword, workspace.password);
                 if (!match) {
                     socket.emit('workspace-password-error', { message: 'La contraseña actual es incorrecta' });
                     return;
@@ -599,21 +711,25 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Crear archivo
         socket.on('create-file', async ({ workspaceId, name, parentPath }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
+            if (!isValidItemName(name) || (parentPath && !isValidItemPath(parentPath))) return;
 
             const parent = parentPath ? getFileByPath(workspace.structure, parentPath) : workspace.structure;
-            
-            if (parent && !parent[name]) {
+            // getFileByPath devuelve los hijos de una carpeta; un archivo no tiene .type 'file' aquí
+            if (!parent || parent.type === 'file') return;
+
+            if (!Object.prototype.hasOwnProperty.call(parent, name)) {
                 parent[name] = { type: 'file', content: '' };
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 await saveWorkspace(workspaceId, workspace);
                 
                 // Log de creación de archivo
                 await logService.logAccess({
                     ip: userIP,
                     workspaceId,
-                    userId: socket.id,
+                    userId: session?.userId || socket.id,
                     sessionId,
                     action: 'create_file',
                     userAgent
@@ -623,23 +739,29 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Crear carpeta
         socket.on('create-folder', async ({ workspaceId, name, parentPath }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
+            if (!isValidItemName(name) || (parentPath && !isValidItemPath(parentPath))) return;
 
             const parent = parentPath ? getFileByPath(workspace.structure, parentPath) : workspace.structure;
-            
-            if (parent && !parent[name]) {
+            // getFileByPath devuelve los hijos de una carpeta; un archivo no tiene .type 'file' aquí
+            if (!parent || parent.type === 'file') return;
+
+            if (!Object.prototype.hasOwnProperty.call(parent, name)) {
                 parent[name] = { type: 'folder', children: {} };
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 await saveWorkspace(workspaceId, workspace);
             }
         });
 
         // Eliminar archivo o carpeta
         socket.on('delete-item', async ({ workspaceId, path }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
+            if (!isValidItemPath(path)) return;
             const parts = path.split('/');
             const itemName = parts.pop()!;
             const parentPath = parts.join('/');
@@ -650,15 +772,19 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             await logService.logAccess({
                 ip: userIP,
                 workspaceId,
-                userId: socket.id,
+                userId: session?.userId || socket.id,
                 sessionId,
                 action: 'delete_file',
                 userAgent
             });
             
-            if (parent && parent[itemName]) {
+            if (parent && Object.prototype.hasOwnProperty.call(parent, itemName)) {
+                if (parent[itemName]?.passwordHash && !unlockedFiles.has(path) && !isPrivileged()) {
+                    socket.emit('chat-system', { message: 'Desbloquea el archivo antes de eliminarlo' });
+                    return;
+                }
                 delete parent[itemName];
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 io.to(workspaceId).emit('item-deleted', { path });
                 await saveWorkspace(workspaceId, workspace);
             }
@@ -666,36 +792,49 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Renombrar archivo o carpeta
         socket.on('rename-item', async ({ workspaceId, path, newName }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
+            if (!isValidItemPath(path) || !isValidItemName(newName)) return;
             const parts = path.split('/');
             const oldName = parts.pop()!;
             const parentPath = parts.join('/');
             const parent = parentPath ? getFileByPath(workspace.structure, parentPath) : workspace.structure;
             
-            if (parent && parent[oldName] && !parent[newName]) {
+            const has = (k: string) => !!parent && Object.prototype.hasOwnProperty.call(parent, k);
+            if (has(oldName) && !has(newName)) {
                 parent[newName] = parent[oldName];
                 delete parent[oldName];
-                io.to(workspaceId).emit('structure-updated', workspace.structure);
+                io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
                 await saveWorkspace(workspaceId, workspace);
             }
         });
 
         // Recibir cambios de texto
         socket.on('send-changes', async ({ workspaceId, path, content, change }) => {
+            if (!joined(workspaceId)) return;
             const workspace = workspaces.get(workspaceId);
             if (!workspace) return;
 
+            if (typeof content !== 'string') return;
             const file = getFileByPath(workspace.structure, path);
             if (file && file.type === 'file') {
+                if (file.passwordHash && !unlockedFiles.has(path)) return;
                 file.content = content;
-                socket.to(workspaceId).emit('receive-changes', {
-                    path: path,
-                    content: content,
-                    change: change
-                });
-                await saveWorkspace(workspaceId, workspace);
+                const payload = { path, content, change };
+                if (file.passwordHash) {
+                    // Archivo protegido: solo a quien lo tenga desbloqueado
+                    for (const id of io.sockets.adapter.rooms.get(workspaceId) || []) {
+                        const other = io.sockets.sockets.get(id);
+                        if (id !== socket.id && other?.data?.unlockedFiles?.has(path)) {
+                            other.emit('receive-changes', payload);
+                        }
+                    }
+                } else {
+                    socket.to(workspaceId).emit('receive-changes', payload);
+                }
+                scheduleSave(workspaceId);
             }
         });
 
@@ -715,7 +854,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 await logService.logAccess({
                     ip: userIP,
                     workspaceId: currentWorkspace,
-                    userId: socket.id,
+                    userId: session?.userId || socket.id,
                     sessionId,
                     action: 'disconnect',
                     userAgent
@@ -765,6 +904,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Tickets en tiempo real
         socket.on('ticket-updated', ({ workspaceId, ticketId }) => {
+            if (!joined(workspaceId)) return;
             socket.to(workspaceId).emit('ticket-refresh', { ticketId });
         });
     });

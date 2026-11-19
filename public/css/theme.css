@@ -1,0 +1,237 @@
+/* ─────────────────────────────────────────────────────────────
+   CodeSpace — tema común
+   Se carga DESPUÉS del <style> de cada página: redefine sus variables
+   para que todas las pantallas compartan paleta, tipografía y detalles.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+    /* Paleta base */
+    /* Gris pizarra neutro + azul corporativo. Sin degradados. */
+    --cs-bg:        #0f1216;
+    --cs-bg-raised: #13171c;
+    --cs-surface:   #171b21;
+    --cs-card:      #1c2128;
+    --cs-hover:     #232932;
+    --cs-select:    #1e3a5f;
+    --cs-border:    #2a313b;
+    --cs-border-2:  #353d49;
+
+    --cs-text:      #e5e8ec;
+    --cs-text-2:    #aab2bd;
+    --cs-muted:     #808a97;
+    --cs-dim:       #57606c;
+
+    --cs-accent:    #3b82f6;   /* azul corporativo */
+    --cs-accent-h:  #2f6fdb;
+    --cs-accent-bg: rgba(59, 130, 246, 0.12);
+    --cs-cyan:      #38bdf8;
+    --cs-blue:      #60a5fa;
+    --cs-green:     #22c55e;
+    --cs-yellow:    #eab308;
+    --cs-orange:    #f59e0b;
+    --cs-red:       #ef4444;
+    --cs-pink:      #93a4bd;
+
+    --cs-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --cs-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+    --cs-radius-sm: 4px;
+    --cs-radius:    6px;
+    --cs-radius-lg: 8px;
+    --cs-shadow:    0 1px 2px rgba(0,0,0,0.25);
+    --cs-ring:      0 0 0 3px rgba(59, 130, 246, 0.35);
+
+    /* ── Variables de dashboard / admin / signin ── */
+    --bg:      var(--cs-bg);
+    --surface: var(--cs-surface);
+    --card:    var(--cs-card);
+    --border:  var(--cs-border);
+    --text:    var(--cs-text);
+    --muted:   var(--cs-muted);
+    --teal:    var(--cs-accent);
+    --blue:    var(--cs-blue);
+    --purple:  var(--cs-pink);
+    --red:     var(--cs-red);
+    --orange:  var(--cs-orange);
+    --green:   var(--cs-green);
+
+    /* ── Variables del editor (workspace) ── */
+    --bg-0: var(--cs-bg);
+    --bg-1: var(--cs-bg-raised);
+    --bg-2: var(--cs-surface);
+    --bg-3: var(--cs-card);
+    --bg-4: var(--cs-border-2);
+    --bg-hover: var(--cs-hover);
+    --bg-select: var(--cs-select);
+    --border-soft: var(--cs-border-2);
+    --txt: var(--cs-text);
+    --txt-2: var(--cs-text-2);
+    --txt-3: var(--cs-muted);
+    --txt-dim: var(--cs-dim);
+    --accent: var(--cs-accent);
+    --accent-h: var(--cs-accent-h);
+    --yellow: var(--cs-yellow);
+    --font: var(--cs-font);
+    --mono: var(--cs-mono);
+    --r-sm: var(--cs-radius-sm);
+    --r-md: 6px;
+    --r-lg: var(--cs-radius-lg);
+
+    color-scheme: dark;
+}
+
+/* El tema claro del editor redefine sus variables en body.light-theme */
+body.light-theme {
+    --bg-0: #eef0f5; --bg-1: #ffffff; --bg-2: #f6f7fb; --bg-3: #ffffff;
+    --bg-4: #dcdfe8; --bg-hover: #eceef6; --bg-select: #dbeafe;
+    --border: #e1e4ec; --border-soft: #d3d7e2;
+    --txt: #161922; --txt-2: #4a5061; --txt-3: #6b7285; --txt-dim: #a3a9b8;
+    --accent: #2563eb; --accent-h: #1d4ed8;
+    color-scheme: light;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+/* Fuente del editor por defecto (el selector de fuente la puede cambiar) */
+.CodeMirror { font-family: var(--cs-mono); }
+
+body {
+    font-family: var(--cs-font) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+}
+
+code, pre, kbd, .mono,
+.ws-id, .ws-link, .terminal, [class*="mono"] {
+    font-family: var(--cs-mono) !important;
+}
+
+::selection { background: rgba(59, 130, 246, 0.35); }
+
+/* Foco visible y consistente para teclado */
+:focus-visible {
+    outline: none;
+    box-shadow: var(--cs-ring) !important;
+    border-radius: var(--cs-radius-sm);
+}
+input:focus, textarea:focus, select:focus {
+    border-color: var(--cs-accent) !important;
+    box-shadow: var(--cs-ring);
+    outline: none;
+}
+
+/* Barras de desplazamiento discretas */
+* { scrollbar-width: thin; scrollbar-color: var(--cs-border-2) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--cs-border-2); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--cs-dim); background-clip: padding-box; }
+
+/* Botones e inputs: transiciones suaves */
+button, .btn, a { transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .1s; }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; opacity: .55; }
+
+/* Tarjetas y modales: un poco más de profundidad */
+.box, .card, .modal, .modal-content, .stat-card, .ws-card, .panel {
+    box-shadow: var(--cs-shadow);
+}
+
+/* Logo: texto sobrio, icono en azul */
+.sidebar-logo, .logo, .brand { color: var(--cs-text) !important; }
+.sidebar-logo svg, .logo svg, .brand svg { stroke: var(--cs-accent); }
+
+/* Editor: CodeMirror con la paleta */
+.cm-s-material-darker.CodeMirror { background: var(--bg-1) !important; color: var(--cs-text) !important; }
+.cm-s-material-darker .CodeMirror-gutters { background: var(--bg-1) !important; border-right: 1px solid var(--border) !important; }
+.cm-s-material-darker .CodeMirror-linenumber { color: var(--cs-dim) !important; }
+.cm-s-material-darker .CodeMirror-activeline-background { background: rgba(59,130,246,0.06) !important; }
+.cm-s-material-darker .CodeMirror-selected,
+.cm-s-material-darker .CodeMirror-focused .CodeMirror-selected { background: rgba(59,130,246,0.22) !important; }
+.cm-s-material-darker .CodeMirror-cursor { border-left-color: var(--cs-accent) !important; }
+.cm-s-material-darker span.cm-keyword  { color: #569cd6; }
+.cm-s-material-darker span.cm-string   { color: #ce9178; }
+.cm-s-material-darker span.cm-number   { color: #b5cea8; }
+.cm-s-material-darker span.cm-comment  { color: #6a7380; font-style: italic; }
+.cm-s-material-darker span.cm-def,
+.cm-s-material-darker span.cm-variable-2 { color: #dcdcaa; }
+.cm-s-material-darker span.cm-property { color: #9cdcfe; }
+.cm-s-material-darker span.cm-tag      { color: #569cd6; }
+.cm-s-material-darker span.cm-attribute{ color: #b5cea8; }
+
+/* Reduce el movimiento si el sistema lo pide */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ── Componentes compartidos (páginas nuevas: inicio y acceso) ── */
+.cs-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 42px; padding: 0 18px; border-radius: var(--cs-radius);
+    font: 600 0.92rem/1 var(--cs-font); cursor: pointer; text-decoration: none;
+    border: 1px solid var(--cs-border-2); background: var(--cs-card); color: var(--cs-text);
+}
+.cs-btn:hover { background: var(--cs-hover); border-color: var(--cs-dim); }
+.cs-btn svg { width: 16px; height: 16px; }
+.cs-btn-primary {
+    background: #2563eb; border-color: transparent; color: #fff;
+}
+.cs-btn-primary:hover { background: #1d4ed8; border-color: transparent; }
+.cs-btn-sm { height: 34px; padding: 0 12px; font-size: 0.84rem; }
+.cs-btn-ghost { background: transparent; border-color: transparent; color: var(--cs-text-2); }
+.cs-btn-ghost:hover { background: var(--cs-hover); color: var(--cs-text); border-color: transparent; }
+
+.cs-input {
+    width: 100%; height: 44px; padding: 0 14px;
+    background: var(--cs-bg-raised); color: var(--cs-text);
+    border: 1px solid var(--cs-border-2); border-radius: var(--cs-radius);
+    font: 400 0.95rem var(--cs-font);
+}
+.cs-input::placeholder { color: var(--cs-dim); }
+
+.cs-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--cs-text-2); margin-bottom: 6px; }
+
+.cs-card {
+    background: var(--cs-surface); border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius-lg); box-shadow: var(--cs-shadow);
+}
+
+.cs-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    padding: 11px 18px; border-radius: var(--cs-radius);
+    background: var(--cs-card); color: var(--cs-text); border: 1px solid var(--cs-border-2);
+    box-shadow: var(--cs-shadow); font-size: .9rem; z-index: 10000;
+    animation: cs-in .2s ease-out;
+}
+.cs-toast.error   { border-color: rgba(248,113,113,.5); }
+.cs-toast.success { border-color: rgba(74,222,128,.5); }
+@keyframes cs-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+
+.cs-bg-glow { display: none; }
+.cs-bg-grid { display: none; }
+
+/* Los controles no heredan la fuente por defecto */
+button, input, select, textarea { font-family: inherit; }
+
+/* Barra de estado del editor: discreta y legible */
+.statusbar {
+    background: var(--bg-1) !important;
+    color: var(--txt-2) !important;
+    border-top: 1px solid var(--border);
+}
+.statusbar * { color: inherit; }
+
+/* Avatar por defecto: silueta genérica de persona */
+.user-avatar {
+    background: #cbd2dc url(/img/avatar-default.svg) center / cover no-repeat !important;
+    color: transparent !important; font-size: 0 !important;
+    border-radius: 50% !important; overflow: hidden;
+}
+.cs-avatar {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    background: #cbd2dc; object-fit: cover; display: inline-block;
+}
+
+/* Sin botones decorativos de ventana estilo macOS */
+.titlebar-button { display: none !important; }

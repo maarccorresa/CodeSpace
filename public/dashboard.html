@@ -10,7 +10,7 @@
         :root {
             --bg: #0f1117; --surface: #161b22; --card: #1c2128;
             --border: #30363d; --text: #e6edf3; --muted: #7d8590;
-            --teal: #4ec9b0; --blue: #79c0ff; --purple: #d2a8ff;
+            --teal: var(--cs-accent); --blue: #79c0ff; --purple: #d2a8ff;
             --red: #ff7b72; --orange: #ffa657; --green: #56d364;
             --sidebar: 220px;
         }
@@ -44,7 +44,7 @@
         }
         .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
         .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-        .nav-item.active { color: var(--teal); background: rgba(78,201,176,0.07); }
+        .nav-item.active { color: var(--teal); background: rgba(59,130,246,0.07); }
         .nav-item.active::before {
             content: ''; position: absolute; left: 0; top: 4px; bottom: 4px;
             width: 3px; background: var(--teal); border-radius: 0 2px 2px 0;
@@ -61,7 +61,7 @@
         }
         .user-avatar {
             width: 30px; height: 30px; border-radius: 6px;
-            background: linear-gradient(135deg, #4ec9b0, #667eea);
+            background: var(--cs-accent);
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 0.8em; color: #0f1117; flex-shrink: 0;
         }
@@ -91,7 +91,7 @@
         }
         .stat-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .stat-icon svg { width: 17px; height: 17px; }
-        .stat-icon.teal   { background: rgba(78,201,176,0.12);  color: var(--teal); }
+        .stat-icon.teal   { background: rgba(59,130,246,0.12);  color: var(--teal); }
         .stat-icon.blue   { background: rgba(121,192,255,0.12); color: var(--blue); }
         .stat-icon.purple { background: rgba(210,168,255,0.12); color: var(--purple); }
         .stat-value { font-size: 1.5em; font-weight: 700; line-height: 1; }
@@ -110,7 +110,7 @@
         .ws-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
         .ws-id { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.9em; color: var(--teal); font-weight: 600; word-break: break-all; }
         .ws-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 8px; font-size: 0.7em; font-weight: 600; flex-shrink: 0; }
-        .ws-badge.owner { background: rgba(78,201,176,0.14); color: var(--teal); }
+        .ws-badge.owner { background: rgba(59,130,246,0.14); color: var(--teal); }
         .ws-badge.member { background: rgba(121,192,255,0.14); color: var(--blue); }
         .ws-badge.locked { background: rgba(210,168,255,0.14); color: var(--purple); }
         .ws-meta { display: flex; gap: 12px; font-size: 0.78em; color: var(--muted); }
@@ -119,7 +119,7 @@
         .ws-footer { display: flex; align-items: center; justify-content: space-between; font-size: 0.77em; color: var(--muted); }
         .ws-open-btn {
             display: inline-flex; align-items: center; gap: 5px;
-            background: var(--teal); color: #0f1117; border: none;
+            background: var(--teal); color: #fff; border: none;
             border-radius: 6px; padding: 5px 11px; font-size: 0.8em; font-weight: 600;
             cursor: pointer; transition: opacity 0.15s;
         }
@@ -138,7 +138,7 @@
 
         .btn {
             display: inline-flex; align-items: center; gap: 6px;
-            background: var(--teal); color: #0f1117; border: none;
+            background: var(--teal); color: #fff; border: none;
             border-radius: 8px; padding: 8px 15px; font-size: 0.85em; font-weight: 600;
             cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
         }
@@ -155,7 +155,7 @@
             color: var(--muted); font-size: 0.875em; transition: all 0.15s;
         }
         .new-ws-card svg { width: 24px; height: 24px; }
-        .new-ws-card:hover { border-color: var(--teal); color: var(--teal); background: rgba(78,201,176,0.04); }
+        .new-ws-card:hover { border-color: var(--teal); color: var(--teal); background: rgba(59,130,246,0.04); }
 
         /* EMPTY STATE */
         .empty-state {
@@ -210,7 +210,7 @@
             background: rgba(255,255,255,0.04); border: 1px solid var(--border);
             display: flex; flex-direction: column; gap: 6px;
         }
-        .ticket-bubble.user { align-self: flex-end; background: rgba(78,201,176,0.08); border-color: rgba(78,201,176,0.22); }
+        .ticket-bubble.user { align-self: flex-end; background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.22); }
         .ticket-bubble.admin { align-self: flex-start; background: rgba(121,192,255,0.08); border-color: rgba(121,192,255,0.22); }
         .ticket-bubble-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.75em; color: var(--muted); }
         .ticket-bubble-user { font-weight: 600; color: var(--text); }
@@ -255,7 +255,7 @@
         /* TOASTS */
         #toasts { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { padding: 10px 15px; border-radius: 8px; font-size: 0.85em; font-weight: 500; max-width: 320px; box-shadow: 0 4px 18px rgba(0,0,0,0.45); animation: tsIn 0.2s ease-out; pointer-events: auto; }
-        .t-success { background: var(--teal);   color: #0f1117; }
+        .t-success { background: var(--teal);   color: #fff; }
         .t-error   { background: var(--red);    color: white; }
         .t-info    { background: var(--blue);   color: #0f1117; }
         @keyframes tsIn  { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -264,6 +264,11 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
     </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 </head>
 <body>
 

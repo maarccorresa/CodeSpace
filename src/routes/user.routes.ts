@@ -1,12 +1,31 @@
 import { Router, Request, Response } from 'express';
 import * as userService from '../services/user.service';
+import { rateLimit } from '../utils/rateLimit';
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '');
+
+// Nueva sesión al identificarse (evita fijación de sesión)
+function startUserSession(req: Request, res: Response, user: { id: string; email: string; username: string; nickname: string }) {
+    req.session.regenerate((err) => {
+        if (err) return res.status(500).json({ error: 'Error al iniciar sesión' });
+        req.session.userEmail    = user.email;
+        req.session.userId       = String(user.id);
+        req.session.userUsername = user.username;
+        req.session.userNickname = user.nickname;
+        req.session.isLoggedIn   = true;
+        res.json({ success: true, user });
+    });
+}
 
 const router = Router();
 
 // ── Registro ──────────────────────────────────────
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', authLimiter, async (req: Request, res: Response) => {
     try {
-        const { email, password, username, nickname } = req.body;
+        const email = str(req.body?.email), password = str(req.body?.password);
+        const username = str(req.body?.username), nickname = str(req.body?.nickname);
 
         if (!email || !password || !username) {
             return res.status(400).json({ error: 'Email, contraseña y nombre de usuario son obligatorios' });
@@ -17,8 +36,11 @@ router.post('/register', async (req: Request, res: Response) => {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ error: 'Email inválido' });
         }
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+        }
+        if (username.trim().length > 40 || nickname.trim().length > 40 || email.length > 254) {
+            return res.status(400).json({ error: 'Algún campo es demasiado largo' });
         }
         if (username.trim().length < 2) {
             return res.status(400).json({ error: 'El nombre de usuario debe tener al menos 2 caracteres' });
@@ -29,13 +51,7 @@ router.post('/register', async (req: Request, res: Response) => {
             return res.status(409).json({ error: result.error });
         }
 
-        req.session.userEmail    = result.user.email;
-        req.session.userId       = result.user.id;
-        req.session.userUsername = result.user.username;
-        req.session.userNickname = result.user.nickname;
-        req.session.isLoggedIn   = true;
-
-        res.json({ success: true, user: result.user });
+        startUserSession(req, res, result.user);
     } catch (error) {
         console.error('Error en registro:', error);
         res.status(500).json({ error: 'Error al registrar usuario' });
@@ -43,9 +59,9 @@ router.post('/register', async (req: Request, res: Response) => {
 });
 
 // ── Login ─────────────────────────────────────────
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', authLimiter, async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
+        const email = str(req.body?.email), password = str(req.body?.password);
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Email y contraseña son obligatorios' });
@@ -56,13 +72,7 @@ router.post('/login', async (req: Request, res: Response) => {
             return res.status(401).json({ error: result.error });
         }
 
-        req.session.userEmail    = result.user.email;
-        req.session.userId       = result.user.id;
-        req.session.userUsername = result.user.username;
-        req.session.userNickname = result.user.nickname;
-        req.session.isLoggedIn   = true;
-
-        res.json({ success: true, user: result.user });
+        startUserSession(req, res, result.user);
     } catch (error) {
         console.error('Error en login:', error);
         res.status(500).json({ error: 'Error al iniciar sesión' });
