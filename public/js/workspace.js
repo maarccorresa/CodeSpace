@@ -442,6 +442,44 @@ function joinWorkspace() {
     socket.emit('join-workspace', { workspaceId, password: workspacePassword });
 }
 
+// Al reconectar (reinicio del servidor, corte de red) hay que volver a entrar:
+// el servidor solo acepta cambios de quien ha entrado en el workspace.
+let socketConnectedOnce = false;
+socket.on('connect', () => {
+    if (socketConnectedOnce) {
+        joinWorkspace();
+        if (username) socket.emit('set-username', { workspaceId, username });
+    }
+    socketConnectedOnce = true;
+});
+
+// Si se inicia o se cierra sesión en otra pestaña, la conexión en tiempo real
+// sigue con la sesión antigua: se reconecta para que el servidor use la nueva.
+let knownUserId = undefined;
+async function syncSessionWithSocket() {
+    try {
+        const res = await fetch('/api/user/me', { credentials: 'include' });
+        const id = res.ok ? (await res.json()).id : null;
+        if (knownUserId !== undefined && id !== knownUserId) {
+            socket.disconnect();
+            socket.connect();
+            if (id) {
+                currentAuthenticatedUser = await loadRegisteredUserSession();
+                updateUserButtonIcon(true, currentAuthenticatedUser);
+            } else {
+                currentAuthenticatedUser = null;
+                updateUserButtonIcon(false);
+            }
+        }
+        knownUserId = id;
+    } catch { /* sin conexión: se reintenta al volver a la pestaña */ }
+}
+syncSessionWithSocket();
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncSessionWithSocket();
+});
+window.addEventListener('focus', syncSessionWithSocket);
+
 // Manejar error de workspace (contraseña requerida/incorrecta)
 socket.on('workspace-error', (data) => {
     if (data.error === 'blocked') {
