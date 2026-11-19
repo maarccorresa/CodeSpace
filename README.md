@@ -52,24 +52,110 @@ La aplicación y la base de datos (MongoDB) se ejecutan en contenedores. No hace
 
 ### Requisitos
 
-- Linux con **Docker** y el plugin **docker compose** (v2). En Ubuntu/Debian: `curl -fsSL https://get.docker.com | sh`
-- 1 GB de RAM libre como mínimo.
+- Servidor **Ubuntu 22.04/24.04** o **Debian 12** con un usuario con `sudo`.
+- 1 GB de RAM libre y 5 GB de disco como mínimo.
+- El puerto de la aplicación abierto (por defecto `3000`).
 
-### Pasos
+### Pasos de instalación (servidor desde cero)
+
+**1. Actualiza el sistema e instala las herramientas básicas**
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl openssl ca-certificates
+```
+
+**2. Instala Docker** (incluye `docker compose`)
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+```
+
+**3. Permite usar Docker sin `sudo`**
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Cierra la sesión SSH y vuelve a entrar para que el cambio se aplique. Compruébalo con:
+
+```bash
+docker run --rm hello-world
+```
+
+**4. Descarga CodeSpace**
 
 ```bash
 git clone https://github.com/maarccorresa/CodeSpace.git
 cd CodeSpace
+```
+
+**5. Instala y arranca**
+
+```bash
 ./codespace install
 ```
 
-`./codespace install`:
-1. Pregunta el email del administrador y el puerto (por defecto `3000`).
-2. Crea `.env` con claves aleatorias: secreto de sesión, contraseña de MongoDB y contraseña del administrador.
-3. Construye la imagen y arranca dos contenedores: `app` y `mongo`.
-4. Espera a que la aplicación responda y muestra la URL y los datos de acceso a `/login`.
+- Pregunta el **email del administrador** y el **puerto** (Enter deja `3000`).
+- Crea `.env` con claves aleatorias: secreto de sesión, contraseña de MongoDB y contraseña del administrador.
+- Construye la imagen y arranca dos contenedores: `app` y `mongo`. La primera vez tarda unos minutos.
+- Al terminar muestra la URL, el email y la **contraseña del administrador**. Guárdala; también está en `.env` (`ADMIN_PASSWORD`).
+
+**6. Abre el puerto en el cortafuegos** (si usas `ufw`)
+
+```bash
+sudo ufw allow 3000/tcp
+```
+
+**7. Entra en la aplicación**
+
+- Editor: `http://<IP-del-servidor>:3000`
+- Administración: `http://<IP-del-servidor>:3000/login`, con el email y la contraseña del paso 5.
+
+**8. (Opcional) Cambia la contraseña del administrador**
+
+Edita `ADMIN_PASSWORD` en `.env` (8 caracteres o más) y aplica el cambio:
+
+```bash
+nano .env
+./codespace restart
+```
+
+**9. (Recomendado) Programa una copia de seguridad diaria**
+
+```bash
+crontab -e
+```
+
+Añade esta línea (copia cada día a las 03:00 en `CodeSpace/backups`):
+
+```
+0 3 * * * cd /home/<usuario>/CodeSpace && ./codespace backup >> backup.log 2>&1
+```
+
+Copia esa carpeta fuera del servidor de vez en cuando: si el disco falla, se pierde con él.
 
 MongoDB no publica ningún puerto: solo la aplicación llega a él. Los datos se guardan en volúmenes de Docker (`mongo-data`, `workspaces`, `tickets`), así que sobreviven a reinicios y actualizaciones.
+
+### Actualizar a una versión nueva
+
+```bash
+cd ~/CodeSpace
+./codespace backup
+./codespace update
+```
+
+`update` descarga el código (`git pull`), reconstruye la imagen y reinicia sin borrar datos.
+
+### Si algo falla
+
+| Síntoma | Qué hacer |
+|---|---|
+| `permission denied ... docker.sock` | No has cerrado sesión tras el paso 3 |
+| `La aplicación no responde` | `./codespace logs` y revisa el error |
+| No carga desde otro equipo | Abre el puerto (paso 6) y revisa el cortafuegos del proveedor |
+| `SESSION_SECRET` / `ADMIN_PASSWORD` en los registros | Valores de ejemplo o demasiado cortos en `.env` |
+| Puerto 3000 ocupado | Cambia `APP_PORT` en `.env` y `./codespace restart` |
 
 ### Órdenes de gestión
 
