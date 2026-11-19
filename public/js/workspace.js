@@ -492,6 +492,19 @@ socket.on('workspace-error', (data) => {
         return;
     }
     
+    if (data.error === 'too_many_attempts') {
+        showToast('Demasiados intentos de contraseña. Espera unos minutos.');
+        return;
+    }
+    if (data.error === 'too_many_workspaces') {
+        showToast('Has creado demasiados workspaces. Espera un rato.');
+        return;
+    }
+    if (data.error === 'invalid_workspace') {
+        showToast('Nombre de workspace no válido.');
+        return;
+    }
+
     if (data.error === 'password_required') {
         showPasswordModal();
     } else if (data.error === 'invalid_password') {
@@ -2881,6 +2894,11 @@ async function exportToGitHub() {
         
         if (!owner || !repoName) {
             showToast('Formato de repositorio inválido. Usa: usuario/repositorio');
+            return;
+        }
+        // Solo caracteres válidos de GitHub (evita inyección en las instrucciones)
+        if (!/^[A-Za-z0-9_.-]+$/.test(owner) || !/^[A-Za-z0-9_.-]+$/.test(repoName)) {
+            showToast('El repositorio solo puede tener letras, números, - _ y .');
             return;
         }
         

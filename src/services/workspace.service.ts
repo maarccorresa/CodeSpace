@@ -306,3 +306,14 @@ export async function listAllWorkspaces(): Promise<Array<{
 
     return Array.from(result.values()).sort((a, b) => (b.lastAccess || 0) - (a.lastAccess || 0));
 }
+
+// ¿Existe el workspace en disco? (sin cargarlo en memoria)
+export async function workspaceExists(workspaceId: string): Promise<boolean> {
+    if (!isValidWorkspaceId(workspaceId)) return false;
+    try {
+        await fs.access(path.join(DATA_DIR, `${workspaceId}.json`));
+        return true;
+    } catch {
+        return false;
+    }
+}

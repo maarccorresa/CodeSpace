@@ -6,6 +6,12 @@ import * as logService from '../services/log.service';
 import * as userService from '../services/user.service';
 import { isValidItemName, isValidItemPath, isValidWorkspaceId } from '../utils/validation';
 import { config } from '../config';
+import {
+    passwordAttemptBlocked, registerPasswordFailure, workspaceCreationBlocked,
+    chatFlooded, clearChatRate, structureBytes, structureCount,
+    MAX_FILE_BYTES, MAX_WORKSPACE_BYTES, MAX_FILES_PER_WORKSPACE
+} from '../utils/socketLimits';
+import { workspaceExists } from '../services/workspace.service';
 
 const MAX_CHAT_LENGTH = 2000;
 const MAX_USERNAME_LENGTH = 40;
@@ -114,6 +120,20 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
                 return;
             }
 
+            // Freno de fuerza bruta sobre la contraseña del workspace (por IP)
+            if (!isPrivileged() && passwordAttemptBlocked(userIP)) {
+                socket.emit('workspace-error', { error: 'too_many_attempts' });
+                return;
+            }
+
+            // Límite de creación de workspaces nuevos por IP (evita llenar el disco)
+            if (!isPrivileged() && !workspaces.has(workspaceId) && !(await workspaceExists(workspaceId))) {
+                if (workspaceCreationBlocked(userIP)) {
+                    socket.emit('workspace-error', { error: 'too_many_workspaces' });
+                    return;
+                }
+            }
+
             // Los admins y moderadores pasan sin contraseña
             const workspace = await initWorkspace(workspaceId, password, isPrivileged());
             
@@ -121,6 +141,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             if ('error' in workspace) {
                 // Registrar intento fallido de contraseña
                 if (workspace.error === 'invalid_password') {
+                    registerPasswordFailure(userIP);
                     await logService.logAccess({
                         ip: userIP,
                         workspaceId,
@@ -439,6 +460,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
         socket.on('chat-message', async ({ workspaceId, username, message, timestamp }) => {
             if (!joined(workspaceId)) return;
             if (typeof message !== 'string' || !message.trim()) return;
+            if (chatFlooded(socket.id)) return;
             message = message.slice(0, MAX_CHAT_LENGTH);
             username = workspaces.get(workspaceId)?.connectedUsers?.get(socket.id) || cleanName(username) || 'Anónimo';
             const data = { username, message, timestamp: Date.now() };
@@ -720,6 +742,10 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             // getFileByPath devuelve los hijos de una carpeta; un archivo no tiene .type 'file' aquí
             if (!parent || parent.type === 'file') return;
 
+            if (structureCount(workspace.structure) >= MAX_FILES_PER_WORKSPACE) {
+                socket.emit('chat-system', { message: `Límite de ${MAX_FILES_PER_WORKSPACE} archivos por workspace alcanzado` });
+                return;
+            }
             if (!Object.prototype.hasOwnProperty.call(parent, name)) {
                 parent[name] = { type: 'file', content: '' };
                 io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
@@ -748,6 +774,10 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             // getFileByPath devuelve los hijos de una carpeta; un archivo no tiene .type 'file' aquí
             if (!parent || parent.type === 'file') return;
 
+            if (structureCount(workspace.structure) >= MAX_FILES_PER_WORKSPACE) {
+                socket.emit('chat-system', { message: `Límite de ${MAX_FILES_PER_WORKSPACE} archivos por workspace alcanzado` });
+                return;
+            }
             if (!Object.prototype.hasOwnProperty.call(parent, name)) {
                 parent[name] = { type: 'folder', children: {} };
                 io.to(workspaceId).emit('structure-updated', publicStructure(workspace.structure));
@@ -818,9 +848,19 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
             if (!workspace) return;
 
             if (typeof content !== 'string') return;
+            if (content.length > MAX_FILE_BYTES) {
+                socket.emit('chat-system', { message: 'El archivo supera el límite de 2 MB' });
+                return;
+            }
             const file = getFileByPath(workspace.structure, path);
             if (file && file.type === 'file') {
                 if (file.passwordHash && !unlockedFiles.has(path)) return;
+                const prev = file.content || '';
+                const projected = structureBytes(workspace.structure) - prev.length + content.length;
+                if (projected > MAX_WORKSPACE_BYTES) {
+                    socket.emit('chat-system', { message: 'El workspace supera el límite de 25 MB' });
+                    return;
+                }
                 file.content = content;
                 const payload = { path, content, change };
                 if (file.passwordHash) {
@@ -840,6 +880,7 @@ export function setupSocketHandlers(io: SocketIOServer, sessionMiddleware: any):
 
         // Desconexión
         socket.on('disconnect', async () => {
+            clearChatRate(socket.id);
             // Limpiar registro de usuario online
             if (connectedUserId) {
                 const sockets = onlineUserSockets.get(connectedUserId);
